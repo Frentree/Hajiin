@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.exception.dao.piManageSearchListDAO">
+
+    <!-- 정탐/오탐 리스트 조회 -->
+    <select id="searchProcessList" parameterType="hashmap" resultType="hashmap">
+        SELECT DPG.IDX, 
+		       T.NAME,
+               IF(SUBSTRING(T.PLATFORM, 1, 5) = 'Apple', SUBSTRING_INDEX(T.NAME, '.', -1), SUBSTRING_INDEX(T.NAME, '.', 1)) AS MAC_NAME,
+			   IF(SUBSTRING(T.PLATFORM, 1, 5) = 'Apple', SUBSTRING_INDEX(T.NAME, '.', 1), null) AS MAC_SERIAL,
+			   T.PLATFORM, 
+               DPG.TARGET_ID,
+		       DPG.data_processing_name AS FILENAME, 
+		       DATE_FORMAT(DPG.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+		       DATE_FORMAT(DPG.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE, 
+--		       CASE WHEN DPG.APPROVAL_STATUS = '' THEN NULL ELSE DPG.APPROVAL_STATUS END AS APPROVAL_STATUS,
+		       CASE WHEN DPG.APPROVAL_STATUS = 'E' THEN '승인완료' 
+		            WHEN DPG.APPROVAL_STATUS = 'D' THEN '반려'
+		            WHEN DPG.APPROVAL_STATUS = 'W' THEN '승인대기'
+		            ELSE '' END APPROVAL_STATUS,
+--			   DPG.APPROVAL_STATUS,
+			   DPG.NOTE, 
+		       DPG.USER_NO, DPG.OK_USER_NO
+		 FROM  PI_DATA_PROCESSING_GROUP AS DPG, pi_targets AS T
+		WHERE  T.TARGET_ID = DPG.TARGET_ID
+			   AND DATE_FORMAT(DPG.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+		<if test='filename != null and filename != ""'>
+			   AND DPG.data_processing_name LIKE CONCAT('%',#{filename},'%')
+		</if>
+        <choose>
+            <when test='status != null and status != "" and status == "NR"'>
+                AND (DPG.APPROVAL_STATUS IS NULL OR DPG.APPROVAL_STATUS = '')
+            </when>
+            <otherwise>
+                <if test='status != null and status != ""'>
+                    AND DPG.APPROVAL_STATUS = #{status}
+                </if>
+            </otherwise>
+        </choose>
+         ORDER BY DPG.REGDATE DESC, DPG.OKDATE DESC
+        
+        <!-- 
+        SELECT DPG.IDX, 
+               T.NAME AS OWNER, 
+               DPG.TARGET_ID,
+               DPG.data_processing_name AS FILENAME, 
+               DATE_FORMAT(DPG.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+               DATE_FORMAT(DPG.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE, 
+               DPG.APPROVAL_STATUS, DPG.NOTE, 
+               DPG.USER_NO, DPG.OK_USER_NO
+          FROM PI_DATA_PROCESSING_GROUP AS DPG
+             , pi_targets AS T
+         WHERE T.TARGET_ID = DPG.TARGET_ID
+           AND DPG.USER_NO = (#{user_no})
+           AND DATE_FORMAT(DPG.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test='owner != null and owner != ""'>
+           AND T.NAME LIKE CONCAT('%',#{owner},'%')
+       </if>
+        <if test='filename != null and filename != ""'>
+           AND DPG.data_processing_name LIKE CONCAT('%',#{filename},'%')
+       </if>
+
+        <choose>
+            <when test='status != null and status != "" and status == "NR"'>
+                AND (DPG.APPROVAL_STATUS IS NULL OR DPG.APPROVAL_STATUS = '')
+            </when>
+            <otherwise>
+                <if test='status != null and status != ""'>
+                    AND DPG.APPROVAL_STATUS = #{status}
+                </if>
+            </otherwise>
+        </choose>
+         ORDER BY DPG.REGDATE DESC, DPG.OKDATE DESC
+		 -->
+    </select>
+    
+    <select id="selectProcessPath" parameterType="hashmap" resultType="hashmap">
+       SELECT DP.hash_id,
+              DPG.idx AS CHARGE_ID,
+              (SELECT processing_flag_name 
+                   FROM pi_data_processing_flag 
+                   WHERE processing_flag = DP.processing_flag) AS FLAG,
+              DP.user_no,
+              DPG.data_processing_name, 
+              F.PATH
+         FROM PI_FIND AS F
+             ,pi_data_processing AS DP
+             ,pi_data_processing_group AS DPG
+        WHERE 1=1
+          AND DP.target_id = F.target_id
+          AND DP.group_id = F.group_id
+          AND DP.hash_id = F.hash_id
+          AND DPG.idx = DP.data_processing_group_idx 
+          AND DPG.target_id = DP.target_id 
+          AND DPG.idx = #{data_processing_group_idx}
+    </select>
+    
+</mapper>

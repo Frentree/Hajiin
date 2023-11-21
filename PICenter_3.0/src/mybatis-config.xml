@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" 	"http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+	<typeAliases>
+		<typeAlias type="com.org.iopts.dto.MemberVO" alias="memberVO" />
+		<typeAlias type="com.org.iopts.dto.Pi_UserVO" alias="pi_userVO" />
+		<typeAlias type="com.org.iopts.dto.Pi_TargetVO" alias="pi_targetVO" />
+		<typeAlias type="com.org.iopts.dto.Pi_AgentVO" alias="pi_agentVO" />
+		<typeAlias type="com.org.iopts.dto.Pi_Target_ManageVO" alias="pi_target_manegeVO" />
+		<typeAlias type="com.org.iopts.dto.Pi_ScheduleVO" alias="Pi_ScheduleVO" />
+		<typeAlias type="com.org.iopts.dto.Pi_ExceptionFindSubpathVO" alias="Pi_ExceptionFindSubpathVO" />
+		<typeAlias type="com.org.iopts.dto.Pi_TotalDatetypeVO" alias="Pi_TotalDatetypeVO" />
+	</typeAliases>
+
+<!-- 
+	<typeHandlers>
+		<typeHandler javaType="java.sql.Timestamp" handler="org.apache.ibatis.type.DateTypeHandler" />
+		<typeHandler javaType="java.sql.Time" handler="org.apache.ibatis.type.DateTypeHandler" />
+		<typeHandler javaType="java.sql.Date" handler="org.apache.ibatis.type.DateTypeHandler" />
+	</typeHandlers>
+ -->
+</configuration>
+	

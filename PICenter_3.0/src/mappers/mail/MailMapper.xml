@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.mail.dao.MailDAO">
+
+    <!-- <select id="serverGroupMail" parameterType="hashmap" resultType="com.org.iopts.mail.vo.MailVo">
+       SELECT T.ASSETNOSCH, T.BPINFRAUSERID, T.BPINFRAUSERNM, T.HOSTNM, U.USER_EMAIL
+		FROM skt_toms T, pi_user U
+		WHERE 1=1
+		 AND T.ASSETNOSCH IN 
+		 <foreach collection="assetnosch" open="(" close=")" separator="," item="item">
+			#{item}
+		</foreach>
+		 AND T.BPINFRAUSERID = U.USER_NO
+		GROUP BY T.ASSETNOSCH
+		ORDER BY T.BPINFRAUSERID
+    </select>
+    
+    <select id="serverGroupMailUser" parameterType="hashmap" resultType="com.org.iopts.mail.vo.MailVo">
+       SELECT T.BPINFRAUSERID, T.BPINFRAUSERNM, U.USER_EMAIL,
+       		  IFNULL(U.SOSOK, '') AS SOSOK
+		FROM skt_toms T, pi_user U
+		WHERE 1=1
+		 AND T.ASSETNOSCH IN 
+		 <foreach collection="assetnosch" open="(" close=")" separator="," item="item">
+			#{item}
+		</foreach>
+		 AND T.BPINFRAUSERID = U.USER_NO
+		 AND T.BPINFRAUSERID = #{id}
+		GROUP BY T.BPINFRAUSERID
+    </select> -->
+    
+    <select id="serverGroupMail" parameterType="hashmap" resultType="com.org.iopts.mail.vo.MailVo">
+      SELECT D.HOSTNM,
+			D.TARGET_ID,
+			D.BPINFRAUSER,
+			(SELECT U.USER_EMAIL FROM pi_user U WHERE U.USER_NO = D.BPINFRAUSER) AS BPINFRAUSER_MAIL,
+			D.BPAPPUSERID,
+			(SELECT U.USER_EMAIL FROM pi_user U WHERE U.USER_NO = D.BPAPPUSERID) AS BPAPPUSER_MAIL,
+			D.SKTINFRAUSERID,
+			(SELECT U.USER_EMAIL FROM pi_user U WHERE U.USER_NO = D.SKTINFRAUSERID) AS SKTINFRAUSER_MAIL,
+			D.ASSETNOSCH,
+			IFNULL(D.SERVICE_NM, '-') AS SERVICE_NM,
+			IFNULL(D.AGENT_CONNECTED_IP, '없음') AS AGENT_CONNECTED_IP
+		FROM(
+			SELECT ST.HOSTNM,
+				PT.TARGET_ID,
+				IF(PTU.TARGET_ID IS NOT NULL, PTU.USER_NO, ST.BPINFRAUSERID) AS BPINFRAUSER, 
+				IF(PTU.TARGET_ID IS NOT NULL, PTU.SERVICE_USER, ST.BPAPPUSERID) AS BPAPPUSERID, 
+				IF(PTU.TARGET_ID IS NOT NULL, PTU.INFRA_MANAGER, ST.SKTINFRAUSERID) AS SKTINFRAUSERID,
+				ST.ASSETNOSCH,
+				PTU.SERVICE_NM,
+				A.AGENT_CONNECTED_IP
+			FROM skt_toms ST
+				LEFT OUTER JOIN pi_agents A ON ST.HOSTNM = A.AGENT_NAME AND A.AP_NO = 0
+				LEFT OUTER JOIN pi_targets PT ON ST.HOSTNM = PT.NAME AND PT.AP_NO = 0 
+				LEFT OUTER JOIN pi_target_user PTU ON PT.TARGET_ID = PTU.TARGET_ID AND PT.AP_NO = PTU.AP_NO
+		) AS D
+		WHERE 1=1
+		AND D.ASSETNOSCH IN 
+			 <foreach collection="assetnosch" open="(" close=")" separator="," item="item">
+				#{item}
+			</foreach>
+    </select>
+    
+    <select id="selectUserList" parameterType="hashmap" resultType="com.org.iopts.mail.vo.UserVo">
+     	SELECT U.USER_NO, U.USER_EMAIL, 
+			IFNULL(U.SOSOK, '') AS SOSOK, U.USER_NAME
+		FROM
+		pi_user U
+		WHERE USER_NO = #{user_no}
+	</select>
+	
+    <select id="selectSendUserList" parameterType="hashmap" resultType="com.org.iopts.mail.vo.UserVo">
+     	SELECT U.USER_NO, U.USER_EMAIL, IFNULL(U.SOSOK, '') AS SOSOK, DPG.NOTEPAD,
+     			U.USER_NAME, CONCAT(T.NAME, ' : ', DPG.DATA_PROCESSING_NAME) AS DETAIL_CON, #{comment} AS COMMENT
+		FROM PI_USER U, PI_DATA_PROCESSING DP, PI_TARGETS T, PI_DATA_PROCESSING_GROUP DPG
+		WHERE U.USER_NO = #{ok_user_no}
+			AND T.TARGET_ID = DP.TARGET_ID
+			AND T.TARGET_ID = DPG.TARGET_ID
+			AND T.AP_NO = DP.AP_NO
+			# AND DF.PROCESSING_FLAG = DP.PROCESSING_FLAG
+			# AND DP.DATA_PROCESSING_GROUP_IDX IN 
+			AND DPG.IDX IN
+			<foreach collection="idxList" open="(" close=")" separator="," item="item">
+				#{item}
+			</foreach>
+			GROUP BY DETAIL_CON
+	</select>
+	
+    <!-- <select id="selectApprovalList" parameterType="hashmap" resultType="com.org.iopts.mail.vo.ApprovalVo">
+     	SELECT CONCAT(T.NAME, ' : ', DF.PROCESSING_FLAG_NAME) AS DETAIL_CON, #{comment} AS COMMENT
+		FROM PI_DATA_PROCESSING DP, pi_targets T, pi_data_processing_flag DF
+		WHERE 1=1
+			AND T.TARGET_ID = DP.TARGET_ID
+			AND T.AP_NO = DP.AP_NO
+			AND DF.PROCESSING_FLAG = DP.PROCESSING_FLAG
+			AND DP.DATA_PROCESSING_GROUP_IDX IN 
+			<foreach collection="idxList" open="(" close=")" separator="," item="item">
+				#{item}
+			</foreach>
+			GROUP BY DETAIL_CON
+	</select> -->
+	
+    <select id="selectDate" parameterType="hashmap" resultType="com.org.iopts.mail.vo.MailVo">
+      SELECT DATE_FORMAT(NOW(), '%Y년 %m월 %d일') AS DATE
+    </select>
+	
+	<insert id="templateInsert" parameterType="hashmap">
+		INSERT INTO PI_TEMPLATE
+		(NAME, CON, FLAG)
+		VALUES
+		(#{name}, #{template_con}, 'Y')
+	</insert>
+	
+    <select id="selectTemplate" parameterType="String" resultType="String">
+    	SELECT T.CON
+		FROM PI_TEMPLATE T
+		WHERE T.NAME = #{mailFlag}
+		AND T.FLAG = 'Y'
+    </select>
+    
+    <update id="templateUpdate" parameterType="hashmap">
+    	UPDATE PI_TEMPLATE
+		SET FLAG = 'N'
+		WHERE FLAG = 'Y'
+		AND NAME = #{name}
+    </update>    
+</mapper>

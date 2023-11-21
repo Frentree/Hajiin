@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.mapper.SetMapper">
+
+	<select id="selectSetting" resultType="hashmap">
+		SELECT S.NAME, S.STATUS, S.DETAIL_NAME
+		FROM PI_SETTING S
+		ORDER BY IDX
+	</select>
+	
+	<select id="patternList" resultType="hashmap">
+		SELECT CP.PATTERN_CODE, CP.PATTERN_IDX, CP.PATTERN_CNT, CP.PATTERN_EN_NAME, CP.PATTERN_KR_NAME, 
+			CP.COLOR_CODE, CP.MASK_CNT, CP.MASK_CHK, CP.MASK_TYPE, CP.PATTERN_RULE, CP.PATTERN_UPDATED
+		FROM PI_CUSTOM_PATTERN CP
+		ORDER BY CP.PATTERN_CNT
+	</select>
+	
+	
+</mapper>

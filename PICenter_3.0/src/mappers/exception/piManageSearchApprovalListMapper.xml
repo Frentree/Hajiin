@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.exception.dao.piManageSearchApprovalListDAO">
+
+    <!-- 결재관리 - 정탐/오탐 결재 리스트 조회 -->
+    <select id="searchApprovalListData" parameterType="hashmap" resultType="hashmap">
+        SELECT '0' AS CHK,
+               DPCG.data_processing_charge_id AS CHARGE_ID,
+               DPCG.data_processing_charge_name AS PATH, 
+               DPCG.USER_NO, 
+               PU.USER_NAME,
+               DPCG.OK_USER_NO, 
+               (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = DPCG.ok_user_no) AS OK_USER_NAME,  
+               DATE_FORMAT(DPCG.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+               DATE_FORMAT(DPCG.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE, 
+               DPCG.APPROVAL_STATUS, 
+               DPCG.REASON
+          FROM PI_DATA_PROCESSING_CHARGE_GROUP AS DPCG
+               LEFT OUTER JOIN PI_USER AS PU
+                 ON PU.USER_NO = DPCG.USER_NO
+         WHERE 1 = 1
+        
+        <if test='status != null and status != ""'>
+           AND DPCG.APPROVAL_STATUS = #{status}
+        </if>
+           AND DATE_FORMAT(DPCG.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <!-- 
+        <if test='user_nm != null and user_nm != ""'>
+           AND PU.USER_NAME LIKE CONCAT('%',#{user_nm},'%')
+       </if>
+        -->
+        <if test='path != null and path != ""'>
+           AND DPCG.data_processing_charge_name LIKE CONCAT('%',#{path},'%')
+        </if>
+		<!-- 
+        <choose>
+            <when test='user_grade != 0'>
+                AND (DPCG.USER_NO = #{user_no} OR DPCG.OK_USER_NO = #{user_no})
+            </when>
+            <otherwise>
+                AND DPCG.USER_NO = #{user_no}
+            </otherwise>
+        </choose> -->
+         ORDER BY DPCG.REGDATE DESC, DPCG.OKDATE DESC
+    </select>
+
+	<select id="selectProcessGroupPath" parameterType="hashmap" resultType="hashmap">
+        SELECT DPG.idx AS CHARGE_ID,
+         	   DP.TARGET_ID,
+		       DPG.user_no,
+		       DPG.data_processing_name,
+		       (SELECT processing_flag_name 
+		          FROM pi_data_processing_flag 
+		         WHERE processing_flag = DPG.processing_flag) AS FLAG,
+		        F.PATH
+          FROM PI_FIND AS F
+		      ,pi_data_processing AS DP
+		      ,pi_data_processing_group AS DPG
+         WHERE 1=1
+		   AND DP.target_id = F.target_id
+		   AND DP.group_id = F.group_id
+		   AND DP.hash_id = F.hash_id
+		   AND DPG.idx = DP.data_processing_group_idx
+		   AND DPG.target_id = DP.target_id
+           AND DPG.data_processing_charge_id IN
+        <foreach item="charge_id_list" index="index" collection="charge_id_list" open="(" separator="," close=")">
+                #{charge_id_list}
+        </foreach>
+		<!-- 
+        <choose>
+            <when test='user_grade == 0'>
+                AND DPG.USER_NO = #{user_no}
+            </when>
+            <otherwise>
+                AND DPG.OK_USER_NO = (#{user_no})
+            </otherwise>
+        </choose> -->
+         ORDER BY DPG.idx
+    </select>
+    
+    <!-- 결재관리 - 정탐/오탐 결재 리스트 조회 -->
+    <select id="searchApprovalAllListData" parameterType="hashmap" resultType="hashmap">
+		SELECT DPG.idx AS GROUP_ID,
+		       DPCG.data_processing_charge_id AS CHARGE_ID,
+		       DPCG.data_processing_charge_name AS CHARGE_NAME, 
+		       DPG.user_no,
+		       DPG.data_processing_name,
+		       (SELECT processing_flag_name 
+		          FROM pi_data_processing_flag 
+		         WHERE processing_flag = DPG.processing_flag) AS FLAG,
+		        F.PATH
+		  FROM PI_FIND AS F
+		      ,pi_data_processing AS DP
+		      ,pi_data_processing_group AS DPG
+		      ,PI_DATA_PROCESSING_CHARGE_GROUP AS DPCG
+		 WHERE 1=1
+		   AND DP.target_id = F.target_id
+		   AND DP.group_id = F.group_id
+		   AND DP.hash_id = F.hash_id
+		   AND DPG.idx = DP.data_processing_group_idx
+		   AND DPG.target_id = DP.target_id
+		   AND DPCG.APPROVAL_STATUS = 'W'
+		 AND DPG.data_processing_charge_id = DPCG.data_processing_charge_id
+#		 AND DPG.OK_USER_NO = #{user_no}
+		 ORDER BY DPCG.data_processing_charge_id DESC, DPG.idx
+    </select>
+    
+</mapper>

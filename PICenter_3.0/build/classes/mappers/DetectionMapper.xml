@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.mapper.DetectionMapper">
+	
+	<select id="selectTeamMember" parameterType="hashmap" resultType="hashmap">
+		SELECT U.USER_NO, U.JIKWEE, U.JIKGUK, U.BOSS_NAME, U.USER_GRADE, U.USER_NAME, U.INSA_CODE, G.TEAM_NAME, U.REGDATE
+		  FROM PI_USER U, PI_GROUP G
+		 WHERE U.INSA_CODE = G.INSA_CODE 
+		   AND U.INSA_CODE = #{insa_code}
+		   AND U.USER_NO != #{user_no}
+		   AND USER_GRADE > 0
+	</select>
+	
+	<insert id="registProcessGroup" parameterType="hashmap" useGeneratedKeys="true" keyProperty="idx">
+		INSERT INTO pi_data_processing_group (
+			target_id
+		   ,user_no
+		   ,approval_status
+		   ,REGDATE
+		   ,data_processing_name
+		   ,processing_flag
+		   ,next_date_remedi
+		   ,data_processing_group_id
+		)
+		SELECT TARGET_ID
+			  ,#{user_no}
+			  ,''
+			  ,NOW()
+			  ,#{data_processing_name}
+			  ,#{processing_flag}
+			  ,#{next_date_remedi}
+			  ,#{data_processing_group_id}
+		  FROM PI_FIND WHERE HASH_ID = #{hash_id}
+		ON DUPLICATE KEY
+			UPDATE APPROVAL_STATUS = 'W',
+			REGDATE = NOW()
+		<!-- INSERT INTO pi_data_processing_group		# old version
+			(target_id, user_no, ok_user_no, approval_status, REGDATE, OKDATE, reason, return_reason, data_processing_name, processing_flag, next_date_remedi, data_processing_group_id)
+			(
+			SELECT A.* FROM (
+				SELECT TARGET_ID AS A, #{user_no} AS B, NULL AS OK_USER_NO, '' AS APPROVAL_STATUS, NOW() AS REGDATE, NULL AS OKDATE, NULL AS REASON, NULL AS RETURN_REASON, #{data_processing_name} AS D, #{processing_flag} AS E, #{next_date_remedi} AS F, #{data_processing_group_id} AS G 
+			FROM PI_FIND WHERE HASH_ID IN (#{hash_id})
+			  UNION
+				SELECT TARGET_ID AS A, #{user_no} AS B, NULL AS OK_USER_NO, '' AS APPROVAL_STATUS, NOW() AS REGDATE, NULL AS OKDATE, NULL AS REASON, NULL AS RETURN_REASON, #{data_processing_name} AS D, #{processing_flag} AS E, #{next_date_remedi} AS F, #{data_processing_group_id} AS G 
+			FROM PI_SUBPATH WHERE NODE_ID IN (#{hash_id})
+			) A
+			)
+			ON DUPLICATE KEY
+			UPDATE APPROVAL_STATUS = 'W',
+			REGDATE = NOW() -->
+	</insert>
+	
+	<insert id="registProcess" parameterType="hashmap" useGeneratedKeys="true" keyProperty="data_procession_idx">
+		INSERT INTO PI_DATA_PROCESSING (
+			GROUP_ID
+		   ,TARGET_ID
+		   ,HASH_ID
+		   ,APPROVAL_STATUS
+		   ,REGDATE
+		   ,USER_NO
+		   ,PROCESSING_FLAG
+		   <!-- ,DATA_PROCESSING_GROUP_ID -->
+		   ,DATA_PROCESSING_GROUP_IDX
+		)
+		SELECT GROUP_ID
+			  ,TARGET_ID
+			  ,HASH_ID
+			  ,''
+			  ,NOW()
+			  ,#{user_no}
+			  ,#{processing_flag}
+			  <!-- ,#{data_processing_group_id} -->
+			  ,#{data_processing_group_idx}
+		  FROM PI_FIND WHERE HASH_ID = #{hash_id}
+		ON DUPLICATE KEY
+			UPDATE APPROVAL_STATUS = 'W',
+			REGDATE = NOW()
+		<!-- INSERT INTO PI_DATA_PROCESSING
+			(GROUP_ID, TARGET_ID, HASH_ID, APPROVAL_STATUS, REGDATE, OKDATE, USER_NO, processing_flag, data_processing_group_id) 
+			(
+			SELECT * FROM (
+			  SELECT GROUP_ID, TARGET_ID, HASH_ID, '' AS APPROVAL_STATUS, NOW() AS REGDATE, NULL AS OKDATE, #{user_no}, #{processing_flag} AS FLAG, #{data_processing_group_id}
+			   FROM PI_FIND WHERE HASH_ID IN (#{hash_id})
+			  UNION
+			  SELECT GROUP_ID, TARGET_ID, NODE_ID, '' AS APPROVAL_STATUS, NOW() AS REGDATE, NULL AS OKDATE, #{user_no}, #{processing_flag} AS FLAG, #{data_processing_group_id}
+			   FROM PI_SUBPATH WHERE NODE_ID IN (#{hash_id})
+			) A
+			)
+			ON DUPLICATE KEY
+			UPDATE APPROVAL_STATUS = 'W',
+			REGDATE = NOW() -->
+	</insert>
+	
+	<insert id="registProcessCharge" parameterType="hashmap">
+		INSERT INTO pi_data_processing_charge_group
+			(data_processing_charge_name, user_no, ok_user_no, approval_status, REGDATE, OKDATE, reason, return_reason, data_processing_charge_id)
+			(
+			SELECT A.* FROM (
+				SELECT #{data_processing_charge_name}, #{user_no} AS USER_NO, #{ok_user_no} AS OK_USER_NO, 'W' AS APPROVAL_STATUS, NOW() AS REGDATE,
+					NULL AS OKDATE, NULL AS REASON, NULL AS RETURN_REASON, #{data_processing_charge_id} AS G
+					FROM PI_FIND WHERE TARGET_ID = '15456464750237578083'
+			UNION
+				SELECT #{data_processing_charge_name}, #{user_no} AS USER_NO, NULL AS OK_USER_NO, 'W' AS APPROVAL_STATUS, NOW() AS REGDATE, 
+					NULL AS OKDATE, NULL AS REASON, NULL AS RETURN_REASON, #{data_processing_charge_id} AS G
+					FROM PI_SUBPATH WHERE node_id IN ('-716631126')
+			) A
+			)
+			ON DUPLICATE KEY
+			UPDATE APPROVAL_STATUS = 'W',
+			REGDATE = NOW()
+	</insert>
+	
+	
+	<select id="preCheckRegistPathException" parameterType="hashmap" resultType="int">
+		SELECT COUNT(*)
+		  FROM PI_PATH_EXCEPTION
+		 WHERE HASH_CODE = #{hash_code}
+	</select>
+	
+	
+	<insert id="registPathExceptionGroup" parameterType="hashmap" useGeneratedKeys="true" keyProperty="idx">
+		INSERT INTO PI_PATH_EXCEPTION_GROUP (
+			path_ex_group_name
+		   ,target_id
+		   ,user_no
+		   ,ok_user_no
+		   ,approval_status
+		   ,REGDATE
+		   ,path_ex_flag
+		   ,path_ex_scope
+		   ,path_ex_group_id
+		)
+		SELECT #{path_ex_group_name}
+			  ,#{target_id}
+			  ,#{user_no}
+			  ,NULL
+			  ,''
+			  ,NOW()
+			  ,#{path_ex_flag}
+			  ,#{path_ex_scope}
+			  ,#{path_ex_group_id}
+		  FROM PI_TARGETS
+		 WHERE target_id = #{target_id}
+		   AND NAME = #{path_ex_scope}
+		ON DUPLICATE KEY
+			UPDATE APPROVAL_STATUS = 'W',
+			REGDATE = NOW()
+		<!-- INSERT INTO PI_PATH_EXCEPTION_GROUP
+			(target_id, user_no, ok_user_no, approval_status, REGDATE, OKDATE, reason, return_reason, path_ex_flag, path_ex_scope, path_ex_group_name, path_ex_group_id) 
+			(
+				SELECT #{target_id} AS A , #{user_no} AS B, NULL AS OK_USER_NO, '' AS APPROVAL_STATUS, NOW() AS REGDATE, NULL AS reason, NULL AS OKDATE, NULL AS RETURN_REASON, #{path_ex_flag} AS C, #{path_ex_scope} AS D, #{path_ex_group_name} AS E, #{path_ex_group_id} AS F
+				FROM PI_TARGETS WHERE target_id IN (#{target_id}) AND NAME = #{path_ex_scope}
+			)
+			ON DUPLICATE KEY
+			UPDATE APPROVAL_STATUS = 'W',
+			REGDATE = NOW(); -->
+	</insert>
+	
+	<insert id="registPathException" parameterType="hashmap">
+		INSERT INTO PI_PATH_EXCEPTION (
+			PATH_EX_FLAG
+		   ,PATH_EX
+		   ,PATH_EX_SCOPE
+		   ,USER_NO
+		   ,HASH_CODE
+		   ,path_ex_group_id
+		   ,path_exception_group_idx
+		) VALUES (
+			#{path_ex_flag}
+		   ,#{path_ex}
+		   ,#{path_ex_scope}
+		   ,#{user_no}
+		   ,#{hash_code}
+		   ,#{path_ex_group_id}
+		   ,#{path_exception_group_idx}
+		)
+		<!-- INSERT INTO PI_PATH_EXCEPTION (PATH_EX_FLAG, PATH_EX, PATH_EX_SCOPE, USER_NO, HASH_CODE, path_ex_group_id)
+			VALUES (#{path_ex_flag}, #{path_ex}, #{path_ex_scope}, #{user_no}, #{hash_code}, #{path_ex_group_id}) -->
+	</insert>
+	
+	
+	
+	<insert id="registPathExceptionCharge" parameterType="hashmap">
+		INSERT INTO PI_PATH_EXCEPTION_CHARGE (path_ex_charge_name, user_no, ok_user_no, status, REGDATE, OKDATE, REASON, RETURN_REASON, PATH_EX_CHARGE_ID)
+			VALUES (#{path_ex_charge_name}, #{user_no}, #{ok_user_no}, 'W' , NOW(), NULL, NULL, NULL, #{path_ex_charge_id})
+	</insert>
+	
+	<insert id="registChange" parameterType="hashmap">
+		INSERT INTO PI_CHARGE_UPDATE (TARGET_ID, HASH_ID, PATH, REGDATE, REG_USER_NO, OK_USER_NO, APPROVAL_STATUS)
+			VALUES (#{target_id}, #{hash_id}, #{path}, NOW(), #{user_no}, #{ok_user_no}, 'W' ) 
+	</insert>
+	
+	
+	
+	<update id="updateExcepStatus">
+		UPDATE PI_PATH_EXCEPTION_GROUP
+		SET OK_USER_NO = #{ok_user_no},
+			OKDATE = NOW(),
+			APPROVAL_STATUS = #{apprType},
+			PATH_EX_CHARGE_ID = #{path_ex_charge_id}
+		WHERE IDX = #{idxList}
+	</update>
+	
+	<update id="updateExcepApproval" parameterType="hashmap">
+		UPDATE PI_PATH_EXCEPTION_CHARGE PEC, pi_path_exception_group PEG 
+		SET PEC.OK_USER_NO = #{user_no},
+			PEG.OK_USER_NO = #{user_no},
+			PEC.OKDATE = NOW(),
+			PEC.status = #{apprType},
+			PEG.APPROVAL_STATUS = #{apprType},
+			<if test='apprType == "D"'>
+			PEC.return_reason = #{reason},
+			PEG.return_reason = #{reason}
+			</if>
+			<if test='apprType == "E"'>
+			PEC.reason = #{reason},
+			PEG.reason = #{reason}
+			</if>
+		WHERE PEC.path_ex_charge_id = #{chargeIdList}
+		AND PEG.path_ex_charge_id = #{chargeIdList}
+	</update>
+	
+	<update id="updateProcessStatus">
+		UPDATE PI_DATA_PROCESSING_GROUP DPG, PI_DATA_PROCESSING DP
+			SET DPG.OK_USER_NO = #{ok_user_no},
+				DPG.OKDATE = NOW(),
+				DPG.APPROVAL_STATUS = #{apprType},
+				DP.APPROVAL_STATUS = #{apprType},
+				DPG.data_processing_charge_id = #{data_processing_charge_id},
+				DPG.NOTE = #{comment}
+			WHERE DPG.USER_NO = #{user_no}
+			AND DPG.IDX = #{idx}
+	</update>
+	
+	<update id="updateProcessApproval" parameterType="hashmap">
+		UPDATE PI_DATA_PROCESSING_CHARGE_GROUP DPC, PI_DATA_PROCESSING_GROUP DPG 
+		SET DPC.OK_USER_NO = #{user_no},
+			DPG.OK_USER_NO = #{user_no},
+			DPC.OKDATE = NOW(),
+			DPC.APPROVAL_STATUS = #{apprType},
+			DPG.APPROVAL_STATUS = #{apprType},
+			<if test='apprType == "D"'>
+			DPC.return_reason = #{reason},
+			DPG.return_reason = #{reason}
+			</if>
+			<if test='apprType == "E"'>
+			DPC.reason = #{reason},
+			DPG.reason = #{reason}
+			</if>
+		WHERE DPC.data_processing_charge_id = #{chargeIdList}
+		AND DPG.data_processing_charge_id = #{chargeIdList}
+	</update>
+		
+	<update id="updateChangeApproval">
+		UPDATE PI_CHARGE_UPDATE 
+		SET OK_USER_NO = #{ok_user_no},
+			UPDATE_OWNER = #{user_no},
+			OKDATE = NOW(),
+			APPROVAL_STATUS = #{apprType},
+			<if test='apprType == "D"'>
+			return_reason = #{reason},
+			</if>
+			<if test='apprType == "E"'>
+			reason = #{reason}
+			</if>
+		WHERE IDX = #{idx}
+		AND OK_USER_NO = #{ok_user_no}
+	</update>
+	
+	<update id="approvalPlus" parameterType="hashmap">
+		UPDATE pi_account_info SET approval_id = approval_id + 1 WHERE user_id = (#{user_no})
+	</update>
+	
+	<select id="selectDocuNum" parameterType="hashmap" resultType="hashmap">
+		SELECT APPROVAL_ID AS DOCUNUM
+		FROM PI_ACCOUNT_INFO
+		WHERE USER_ID = (#{user_no})
+	</select>
+	
+	<select id="searchProcessList" parameterType="hashmap" resultType="hashmap">
+		SELECT DPG.IDX, DPG.DATA_PROCESSING_GROUP_ID AS GROUP_ID, T.NAME AS OWNER, DPG.data_processing_name AS FILENAME, DPG.REGDATE, DPG.OKDATE, 
+				DPG.APPROVAL_STATUS, DPG.NOTE, DPG.USER_NO, DPG.OK_USER_NO
+		FROM PI_DATA_PROCESSING_GROUP AS DPG, pi_targets AS T
+		WHERE T.TARGET_ID = DPG.TARGET_ID
+			AND DPG.USER_NO = (#{user_no})
+			<if test='status != "W"'>
+			AND DPG.APPROVAL_STATUS = #{status}
+			</if>
+			<if test='status == "W"'>
+			AND DPG.APPROVAL_STATUS = 'N' + 'W'
+			</if>
+	</select>
+	
+	<select id="selectProcessPath" parameterType="hashmap" resultType="hashmap">
+		SELECT DP.hash_id, DPG.data_processing_group_id AS CHARGE_ID, (SELECT processing_flag_name FROM pi_data_processing_flag WHERE processing_flag = DP.processing_flag) AS FLAG,
+				DP.user_no, DPG.data_processing_name, C.PATH
+			FROM pi_data_processing_group AS DPG, pi_data_processing AS DP, PI_FIND AS C
+			WHERE DPG.data_processing_group_id IN (DP.data_processing_group_id = #{data_processing_group_id})
+			AND DP.USER_NO = #{user_no}
+			AND C.hash_id = DP.hash_id
+	</select>
+	
+	<select id="selectProcessGroupPath" parameterType="hashmap" resultType="hashmap">
+		SELECT DPG.data_processing_charge_id AS CHARGE_ID, DPG.user_no, DPG.data_processing_name, (SELECT processing_flag_name FROM pi_data_processing_flag WHERE processing_flag = DPG.processing_flag) AS FLAG
+		FROM pi_data_processing_group AS DPG
+		WHERE 1 = 1
+			<!-- AND DPG.data_processing_charge_id  = #{data_processing_charge_id} -->
+			AND DPG.data_processing_charge_id IN
+				<foreach item="charge_id_list" index="index" collection="charge_id_list" open="(" separator="," close=")">
+	                #{charge_id_list}
+	            </foreach>
+			
+			
+			<if test="user_grade == 0">
+			AND USER_NO = #{user_no}
+			</if>
+			<if test="user_grade != 0">
+		 	AND OK_USER_NO = (#{user_no})
+			</if>
+	</select>
+	
+	<select id="selectProcessApprovalPath" parameterType="hashmap" resultType="hashmap">
+		SELECT DPG.data_processing_charge_id AS CHARGE_ID, DPG.user_no, DPG.data_processing_name, (SELECT processing_flag_name FROM pi_data_processing_flag WHERE processing_flag = DPG.processing_flag) AS FLAG
+		FROM pi_data_processing_group AS DPG
+		WHERE DPG.data_processing_charge_id IN #{data_processing_charge_id}
+		 	AND OK_USER_NO = (#{user_no})
+	</select>
+	
+	<select id="searchApprovalListData" parameterType="hashmap" resultType="hashmap">
+		SELECT '0' AS CHK, data_processing_charge_id AS CHARGE_ID, data_processing_charge_name AS PATH, 
+			USER_NO, (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = A.USER_NO) AS USER_NAME,
+			OK_USER_NO, (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = A.ok_user_no) AS OK_USER_NAME,	
+			REGDATE, OKDATE, APPROVAL_STATUS, REASON
+			FROM PI_DATA_PROCESSING_CHARGE_GROUP AS A
+			WHERE USER_NO = #{user_no}
+			<if test="user_grade != 0">
+		 	OR OK_USER_NO = #{user_no}
+			</if>
+	</select>
+	
+	<!-- 결재관리 - 경로예외 관련 -->
+	
+	<select id="selectExceptionList" parameterType="hashmap" resultType="hashmap">
+		SELECT PEG.IDX, PEG.PATH_EX_GROUP_ID AS CHARGE_ID, T.NAME AS OWNER, PEG.path_ex_group_name AS FILENAME, PEG.REGDATE, PEG.OKDATE, 
+				PEG.APPROVAL_STATUS, PEG.REASON, PEG.USER_NO, PEG.OK_USER_NO
+			FROM PI_PATH_EXCEPTION_GROUP AS PEG, pi_targets AS T
+			WHERE T.TARGET_ID = PEG.TARGET_ID
+			AND PEG.USER_NO = (#{user_no})
+			<if test='status != "W"'>
+			AND PEG.APPROVAL_STATUS = #{status}
+			</if>
+			<if test='status == "W"'>
+			AND PEG.APPROVAL_STATUS = 'N' + 'W'
+			</if>
+	</select>
+	
+	<select id="selectExeptionPath" parameterType="hashmap" resultType="hashmap">
+		SELECT PPE.path_ex, PEG.USER_NO, PEG.path_ex_group_id AS CHARGE_ID
+			FROM PI_PATH_EXCEPTION_GROUP AS PEG, pi_path_exception AS PPE
+			WHERE PPE.path_ex_scope = #{path_ex_scope}
+			AND PEG.path_ex_scope = #{path_ex_scope}
+			AND PEG.USER_NO = (#{user_no})
+			AND PEG.path_ex_group_id = #{path_ex_group_id};
+	</select>
+	
+	<select id="selectExeptionName" parameterType="hashmap" resultType="hashmap">
+		SELECT PEG.path_ex_group_name AS FILENAME, PEG.USER_NO, PEG.path_ex_charge_id AS CHARGE_ID
+			FROM PI_PATH_EXCEPTION_GROUP AS PEG, pi_path_exception_charge AS PEC
+			WHERE PEG.path_ex_charge_id = #{path_ex_charge_id}
+			AND PEC.path_ex_charge_id = #{path_ex_charge_id}
+			AND PEG.OK_USER_NO = (#{user_no})
+	</select>
+	
+	<select id="selectChangeList" parameterType="hashmap" resultType="hashmap">
+		SELECT  IDX, (SELECT NAME FROM PI_TARGETS WHERE target_id = CU.target_id) AS HOST, CU.PATH, CU.REG_USER_NO, CU.OK_USER_NO, 
+			(SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = CU.REG_USER_NO) AS REG_USER_NAME,
+			(SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = CU.OK_USER_NO) AS OK_USER_NAME,	
+			CU.REGDATE, CU.OKDATE, CU.APPROVAL_STATUS, CU.REASON, CU.RETURN_REASON
+		FROM PI_CHARGE_UPDATE AS CU, pi_targets AS T
+		WHERE T.TARGET_ID = CU.TARGET_ID
+		AND APPROVAL_STATUS = #{status}
+		<if test='request_status == "R"'>
+		AND REG_USER_NO = #{user_no}
+		</if>
+		<if test='request_status != "R"'>
+		AND OK_USER_NO = #{user_no}
+		</if>
+	</select>
+	
+	<select id="exceptionApprovalListData" parameterType="hashmap" resultType="hashmap">
+		SELECT IDX, path_ex_charge_id AS CHARGE_ID, path_ex_charge_name AS NAME, (SELECT USER_NAME FROM PI_USER WHERE USER_NO = #{user_no}) AS USER_NO, (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = A.USER_NO) AS USER_NAME,
+			OK_USER_NO, (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = A.ok_user_no) AS OK_USER_NAME,	REGDATE, OKDATE, STATUS, REASON
+			FROM PI_PATH_EXCEPTION_CHARGE AS A
+			WHERE 
+			USER_NO = (#{user_no})
+			<if test="user_grade != 0">
+		 	OR OK_USER_NO = (#{user_no})
+			</if>
+	</select>
+	
+	
+	
+	
+	
+	
+	<select id="selectFindSubpath" parameterType="hashmap" resultType="hashmap">
+		WITH RECURSIVE CTE AS (
+			SELECT C.GROUP_ID  AS GID,
+					 C.TARGET_ID AS PID,
+					 C.HASH_ID   AS ID,
+					 C.HASH_ID   AS CID,
+					 C.TARGET_ID AS TID,
+					 #C.PATH      AS NAME,
+					 CONCAT((CASE WHEN IFNULL(PRC_FLAG.PROCESSING_FLAG,'') = '' THEN '0' ELSE 'Z' END), C.PATH) AS NAME,
+					 C.PATH      AS SHORTNAME,
+					 C.PATH      AS PATH,
+					 1           AS LEVEL,
+					 T.NAME      AS HOST,
+					 C.OWNER     AS OWNER,
+					 PRC.APPROVAL_STATUS           AS APPROVAL_STATUS,
+					 PRC.APPROVAL_STATUS           AS LINK_APPROVAL_STATUS,
+					 PRC_FLAG.PROCESSING_FLAG      AS PROCESSING_FLAG,
+					 PRC_FLAG.PROCESSING_FLAG      AS LINK_PROCESSING_FLAG,
+					 PRC_FLAG.PROCESSING_FLAG_NAME AS PROCESSING_FLAG_NAME,
+					 (CASE WHEN PRC_FLAG.PROCESSING_FLAG IS NULL THEN ''
+			 		       ELSE CONCAT((CASE WHEN PRC.APPROVAL_STATUS = 'W' THEN '처리 등록'
+													 WHEN PRC.APPROVAL_STATUS = 'E' THEN '처리 완료' 
+													 WHEN PRC.APPROVAL_STATUS = 'D' THEN '처리 반려' 
+													 ELSE '처리 대기' END ), '_', PRC_FLAG.PROCESSING_FLAG_NAME) END) AS APPROVAL_STATUS_PRINT_NAME
+			  FROM PI_TARGETS T LEFT OUTER JOIN PI_FIND C                              ON C.TARGET_ID = #{target_id}   AND T.GROUP_ID  = C.GROUP_ID AND T.TARGET_ID = C.TARGET_ID
+			  		  				  LEFT OUTER JOIN PI_DATA_PROCESSING PRC           ON PRC.TARGET_ID = #{target_id} AND C.GROUP_ID = PRC.GROUP_ID AND C.HASH_ID = PRC.HASH_ID
+									  LEFT OUTER JOIN PI_DATA_PROCESSING_FLAG PRC_FLAG ON PRC.PROCESSING_FLAG = PRC_FLAG.PROCESSING_FLAG
+			 WHERE T.TARGET_ID = #{target_id}
+			   AND C.OWNER = #{user_no}
+			UNION ALL
+			SELECT C.GROUP_ID    AS GID,
+					 C.PARENT_ID   AS PID,
+					 C.NODE_ID     AS ID,
+					 CTE.CID       AS CID,
+					 C.TARGET_ID   AS TID,
+					 #CONCAT(CTE.NAME , '>' , C.PATH) AS NAME,
+					 CONCAT(CTE.NAME , '>' , C.PATH) AS NAME,
+					 C.PATH        AS SHORTNAME,
+					 CONCAT(CTE.PATH , '>' , C.NODE_ID) AS PATH,
+					 CTE.LEVEL + 1 AS LEVEL,
+					 T.NAME        AS HOST,
+					 C.OWNER       AS OWNER,
+					 '' AS APPROVAL_STATUS,
+					 CTE.LINK_APPROVAL_STATUS AS LINK_APPROVAL_STATUS,
+					 '' AS PROCESSING_FLAG,
+					 CTE.LINK_PROCESSING_FLAG AS LINK_PROCESSING_FLAG,
+					 '' AS PROCESSING_FLAG_NAME,
+					 '' AS APPROVAL_STATUS_PRINT_NAME
+			  FROM PI_SUBPATH C, CTE, PI_TARGETS T 
+			 WHERE C.TARGET_ID = #{target_id}
+			   AND C.PARENT_ID = CTE.ID 
+			   AND C.TARGET_ID = CTE.TID
+				AND C.GROUP_ID  = CTE.GID 
+			   AND C.GROUP_ID  = T.GROUP_ID
+			   AND C.TARGET_ID = T.TARGET_ID
+		)
+		SELECT CTE.PID       AS PID,
+			   CTE.ID        AS ID,
+			   CTE.HOST      AS HOST,
+			   CTE.SHORTNAME AS SHORTNAME,
+			   CTE.PATH      AS PATH,
+			   CTE.HOST      AS HOST,
+			   CTE.LEVEL     AS LEVEL,
+			   SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN DRIVER LICENSE NUMBER') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE4,
+			   SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN FOREIGNER NUMBER') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE2,
+			   SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN PASSPORT') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE3,
+			   SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN RRN') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE1,
+			   ( SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN DRIVER LICENSE NUMBER') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) + 
+			   	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN FOREIGNER NUMBER') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) + 
+			   	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN PASSPORT') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) + 
+			   	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN RRN') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END)) AS TYPE,
+			   CTE.OWNER,
+			   CTE.APPROVAL_STATUS,
+			   CTE.LINK_APPROVAL_STATUS,
+			   CTE.PROCESSING_FLAG,
+			   CTE.LINK_PROCESSING_FLAG,
+			   CTE.PROCESSING_FLAG_NAME,
+			   CTE.APPROVAL_STATUS_PRINT_NAME,
+			   CASE (SELECT IFNULL(COUNT(*),0) FROM CTE AS CTES WHERE CTES.PID = CTE.ID) WHEN 0 THEN 'true' ELSE 'false' END AS LEAF,
+			   'true' AS EXPAND,
+			   '0'    AS CHK
+		  FROM CTE LEFT OUTER JOIN PI_SUMMARY SUMM USE INDEX (PRIMARY) ON SUMM.TARGET_ID = #{target_id} AND SUMM.OBJECT_ID = CTE.ID AND SUMM.GROUP_ID = CTE.GID
+		 WHERE 1 = 1
+		   AND (CASE WHEN IFNULL(CTE.LINK_PROCESSING_FLAG,999) = 5 AND IFNULL(CTE.LINK_APPROVAL_STATUS,'D') = 'E' THEN 'X' ELSE 'O' END) = 'O'		# 오탐(예외처리)로 승인된 자료는 제외
+		GROUP BY CTE.PID, CTE.ID, CTE.NAME, CTE.SHORTNAME, CTE.PATH, CTE.HOST, CTE.LEVEL
+		ORDER BY CTE.NAME
+<!-- 
+		WITH RECURSIVE
+			CTE AS (
+				SELECT C.GROUP_ID AS GID, C.TARGET_ID AS PID, C.HASH_ID AS ID, C.HASH_ID AS CID, C.TARGET_ID AS TID, C.PATH AS NAME, C.PATH AS SHORTNAME, C.PATH AS PATH, 1 LEVEL, T.NAME AS HOST, C.OWNER AS OWNER_BY_FIND
+				  FROM PI_TARGETS AS T, PI_FIND C LEFT OUTER JOIN PI_EXCEPTION E ON C.TARGET_ID = #{target_id}
+           														#AND C.TARGET_ID = E.TARGET_ID
+           														AND C.GROUP_ID  = E.GROUP_ID
+           														AND C.HASH_ID   = E.HASH_ID 
+													            AND E.REGDATE   = (SELECT MAX(EXS.REGDATE) 
+													                                 FROM PI_EXCEPTION EXS 
+													                                WHERE EXS.HASH_ID = C.HASH_ID AND EXS.GROUP_ID = C.GROUP_ID AND EXS.TARGET_ID = C.TARGET_ID )
+				 WHERE C.TARGET_ID = #{target_id}
+				<if test="location != null and location != ''">
+				   AND C.PATH LIKE CONCAT('%', #{location}, '%')
+				</if>
+				   AND T.GROUP_ID = C.GROUP_ID
+				   AND T.TARGET_ID = C.TARGET_ID
+				   AND IFNULL(E.APPROVAL_STATUS,'') != 'E'
+				 UNION ALL
+				SELECT C.GROUP_ID AS GID, C.PARENT_ID AS PID, C.NODE_ID AS ID, CTE.CID AS CID, C.TARGET_ID AS TID, CONCAT(CTE.NAME , '>' , C.PATH) AS NAME, C.PATH AS SHORTNAME, 
+						CONCAT(CTE.PATH , '>' , C.NODE_ID) AS PATH, CTE.LEVEL + 1 AS LEVEL, T.NAME AS HOST, ' ' AS OWNER_BY_FIND
+				  FROM PI_SUBPATH C, CTE, PI_TARGETS AS T 
+				 WHERE C.PARENT_ID = CTE.ID 
+				   AND C.GROUP_ID = CTE.GID 
+				   AND C.TARGET_ID = CTE.TID
+				   AND T.GROUP_ID = C.GROUP_ID
+				   AND T.TARGET_ID = C.TARGET_ID
+			)
+			SELECT CTE.PID, CTE.ID, CTE.NAME, CTE.SHORTNAME AS SHORTNAME, CTE.PATH, CTE.HOST, CTE.LEVEL, 
+			        SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN DRIVER LICENSE NUMBER') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE4,
+			       	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN FOREIGNER NUMBER') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE2,
+			       	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN PASSPORT') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE3,
+			       	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN RRN') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE1,
+	
+			       	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN DRIVER LICENSE NUMBER') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) + 
+			       	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN FOREIGNER NUMBER') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) + 
+			       	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN PASSPORT') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) + 
+			       	SUM(CASE WHEN INSTR(UPPER(SUMM.DATA_TYPE), 'SOUTH KOREAN RRN') > 0 THEN SUMM.MATCH_COUNT ELSE 0 END) AS TYPE,
+			       	/*(SELECT APPROVAL_STATUS FROM pi_charge_update EX
+	              			WHERE EX.HASH_ID = CTE.ID AND EX.TARGET_ID = CTE.TID 
+	                		  AND EX.REGDATE = (SELECT MAX(EXS.REGDATE) FROM PI_EXCEPTION EXS WHERE EXS.HASH_ID = CTE.ID AND EX.TARGET_ID = CTE.TID )) AS STATUS,*/
+			       	/*(SELECT APPROVAL_STATUS FROM pi_data_processing DE
+	              			WHERE DE.HASH_ID = CTE.ID AND DE.GROUP_ID = CTE.GID AND DE.TARGET_ID = CTE.TID) AS DEL_STATUS,*/
+	              	PRC.APPROVAL_STATUS,
+	              	PRC_FLAG.PROCESSING_FLAG,
+	              	PRC_FLAG.PROCESSING_FLAG_NAME,
+	              	(CASE WHEN PRC_FLAG.PROCESSING_FLAG IS NULL THEN ''
+				 		  ELSE CONCAT((CASE WHEN PRC.APPROVAL_STATUS = 'W' THEN '처리 등록'
+						  					WHEN PRC.APPROVAL_STATUS = 'E' THEN '처리 완료' 
+											WHEN PRC.APPROVAL_STATUS = 'D' THEN '처리 반려' 
+											ELSE '처리 대기' END ), '_', PRC_FLAG.PROCESSING_FLAG_NAME) END) AS APPROVAL_STATUS_PRINT_NAME,
+              		CTE.OWNER_BY_FIND,
+              		CASE (SELECT IFNULL(COUNT(*),0) FROM CTE AS CTES WHERE CTES.PID = CTE.ID) WHEN 0 THEN 'true' ELSE 'false' END AS LEAF,
+              		'true' AS EXPAND,
+	            	'0' AS CHK
+	       FROM CTE LEFT OUTER JOIN PI_SUMMARY AS SUMM USE INDEX (PRIMARY) ON SUMM.OBJECT_ID = CTE.ID AND SUMM.GROUP_ID = CTE.GID AND SUMM.TARGET_ID = CTE.TID
+	       			LEFT OUTER JOIN PI_DATA_PROCESSING AS PRC ON CTE.TID = PRC.TARGET_ID AND CTE.ID = PRC.HASH_ID AND CTE.GID = PRC.GROUP_ID
+	       			LEFT OUTER JOIN PI_DATA_PROCESSING_FLAG PRC_FLAG ON PRC.PROCESSING_FLAG = PRC_FLAG.PROCESSING_FLAG
+		  WHERE 1 = 1
+			AND IFNULL(PRC_FLAG.PROCESSING_FLAG,'') <![CDATA[<>]]> '5'
+	      GROUP BY CTE.PID, CTE.ID, CTE.NAME, CTE.SHORTNAME, CTE.PATH, CTE.HOST, CTE.LEVEL
+	      ORDER BY PRC_FLAG.PROCESSING_FLAG IS NULL DESC, CTE.NAME, PRC.APPROVAL_STATUS
+ -->
+	</select>
+</mapper>

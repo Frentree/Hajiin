@@ -1,0 +1,870 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.mapper.UserMapper">
+
+	<!-- mybatis-config.xml의 typeAlias에 등록해두지 않았다면
+	<select id="selectMember" resultType="com.org.iopts.dto.MemberVO" > 
+		SELECT ID, PW ,NAME FROM TEST 
+	</select> 
+	이렇게 해야 한다. -->
+
+	<select id="selectMember" parameterType="hashmap" resultType="hashmap">
+	   SELECT DISTINCT U.USER_NO, 
+	   				   U.JIKWEE, 
+	   				   U.JIKGUK, 
+	   				   U.BOSS_NAME, 
+	   				   U.USER_GRADE, 
+	   				   U.USER_NAME, 
+	   				   U.INSA_CODE, 
+	   				   G.TEAM_NAME, 
+	   				   U.REGDATE,
+					   CASE WHEN U.PASSWORD = SHA2(HEX(#{password}),256) THEN 'Y' ELSE 'N' END AS PASSWORD,
+					   U.USER_GRADE, 
+					   GU.GRADE_NAME,
+					   REPLACE(IFNULL(U.ACCESS_IP, ''), ' ', '') AS ACCESS_IP,
+					   '' AS OFFICE_NM,
+					   U.ENDDATE,
+					   <!-- DATE_FORMAT(U.ENDDATE, '%Y-%m-%d %H:%i:%S') AS ENDDATE, -->
+					   U.STARTDATE,
+					   U.FAILED_COUNT,
+					   if(NOW() > LOCK_DATE, 'N', 'Y') LOCK_ACCOUNT,
+					   CASE WHEN U.PWD_UPT_DT &lt; DATE_ADD(NOW(), INTERVAL -90 DAY) THEN 'Y' ELSE 'N' END AS PWD_EXPIRE,
+					   U.USER_PHONE		AS USER_PHONE,
+					   U.SOSOK,
+					   U.USER_PHONE,
+					   U.USER_EMAIL,
+					   PWD_RESET_STATUS,
+					   U.LOGINDATE,
+					   U.LOCK_STATUS
+		 FROM PI_USER U, PI_GROUP G, PI_GRADE_USER GU
+		WHERE U.INSA_CODE = G.INSA_CODE
+		  AND U.USER_GRADE = GU.GRADE_NO
+		  AND U.USER_ID = (#{user_no})
+	</select>
+	
+	<select id="changeUser" parameterType="hashmap" resultType="hashmap">
+    	SELECT DISTINCT U.USER_NO, 
+	   				   U.JIKWEE, 
+	   				   U.JIKGUK, 
+	   				   U.BOSS_NAME, 
+	   				   U.USER_GRADE, 
+	   				   U.USER_NAME, 
+	   				   U.INSA_CODE, 
+	   				   G.TEAM_NAME, 
+	   				   U.REGDATE,
+					   U.USER_GRADE,
+					   GU.GRADE_NAME, 
+					   REPLACE(IFNULL(U.ACCESS_IP, ''), ' ', '') AS ACCESS_IP,
+					   (SELECT ACC.OFFICE_NM FROM PI_ACCOUNT_INFO ACC WHERE ACC.USER_ID = U.USER_NO LIMIT 1) AS OFFICE_NM,
+					   U.ENDDATE,
+					   <!-- DATE_FORMAT(U.ENDDATE, '%Y-%m-%d %H:%i:%S') AS ENDDATE, -->
+					   U.STARTDATE,
+					   U.FAILED_COUNT,
+					   if(NOW() > LOCK_DATE, 'N', 'Y') LOCK_ACCOUNT,
+					   CASE WHEN U.PWD_UPT_DT &lt; DATE_ADD(NOW(), INTERVAL -90 DAY) THEN 'Y' ELSE 'N' END AS PWD_EXPIRE,
+					   U.USER_PHONE		AS USER_PHONE,
+					   U.USER_EMAIL,
+					   U.LOGINDATE,
+					   U.LOCK_STATUS
+		 FROM PI_USER U, PI_GROUP G, PI_GRADE_USER GU
+		WHERE U.INSA_CODE = G.INSA_CODE
+		  AND U.USER_GRADE = GU.GRADE_NO
+		  AND U.USER_NO = (#{user_no})
+    </select>
+	
+	<select id="selectMemberNum" resultType="hashmap">
+		SELECT USER_NO, IFNULL(USER_PHONE, '') AS USER_PHONE, USER_NAME
+		FROM PI_USER
+		WHERE USER_NO = #{user_no}
+		AND USER_NAME = #{user_name}
+	</select>
+	
+	<select id="updateUserPwd" resultType="hashmap">
+		SELECT USER_NO, IFNULL(USER_PHONE, '') AS USER_PHONE
+		FROM PI_USER
+		WHERE USER_NO = #{user_no}
+		AND USER_NAME = #{user_name}
+	</select>
+	
+	<update id="reset_sms_code" parameterType="hashmap">
+		UPDATE PI_USER SET 
+			SMS_CODE = NULL,
+			SMS_RDATE = NULL
+		WHERE 1=1
+		<if test="user_no != null and user_no != ''">
+			AND USER_NO = #{user_no}
+		</if>
+		<if test="user_name != null and user_name != ''">
+			AND USER_NAME = #{user_name}
+		</if>
+	</update>
+	
+	<update id="resetPwd" parameterType="hashmap">
+		UPDATE pi_user SET 
+		PASSWORD = SHA2(HEX(#{password}),256),
+		PWD_RESET_STATUS = 1,
+		SMS_CODE = NULL
+		WHERE user_no = #{user_no}
+	</update>
+	
+	<update id="changeResetPwd" parameterType="hashmap">
+		UPDATE PI_USER SET
+			PASSWORD = SHA2(HEX(#{newPasswd}),256),
+			PWD_UPT_DT = NOW(),
+			PWD_RESET_STATUS = 0
+		 WHERE USER_NO = #{user_no}
+		   AND PASSWORD = SHA2(HEX(#{oldPassword}),256)
+	</update>
+	
+	<update id="updateFailedCount" parameterType="hashmap">
+		UPDATE PI_USER SET
+		    FAILED_COUNT = #{failed_count}
+		   <if test='lockYn == "Y"'>
+   		   ,LOCK_DATE = DATE_ADD(NOW(), INTERVAL 10 MINUTE)
+   		   </if>
+		   <if test='lockYn == "N"'>
+   		   ,LOCK_DATE = NOW()
+   		   </if>
+		WHERE USER_NO = #{userNo}
+	</update>
+
+    <select id="selectSSOMember" parameterType="hashmap" resultType="hashmap">
+    	SELECT DISTINCT U.USER_NO, 
+	   				   U.JIKWEE, 
+	   				   U.JIKGUK, 
+	   				   U.BOSS_NAME, 
+	   				   U.USER_GRADE, 
+	   				   U.USER_NAME, 
+	   				   U.INSA_CODE, 
+	   				   G.TEAM_NAME, 
+	   				   U.REGDATE,
+					   U.USER_GRADE,
+					   GU.GRADE_NAME, 
+					   REPLACE(IFNULL(U.ACCESS_IP, ''), ' ', '') AS ACCESS_IP,
+					   (SELECT ACC.OFFICE_NM FROM PI_ACCOUNT_INFO ACC WHERE ACC.USER_ID = U.USER_NO LIMIT 1) AS OFFICE_NM,
+					   U.ENDDATE,
+					   <!-- DATE_FORMAT(U.ENDDATE, '%Y-%m-%d %H:%i:%S') AS ENDDATE, -->
+					   U.STARTDATE,
+					   U.FAILED_COUNT,
+					   if(NOW() > LOCK_DATE, 'N', 'Y') LOCK_ACCOUNT,
+					   CASE WHEN U.PWD_UPT_DT &lt; DATE_ADD(NOW(), INTERVAL -90 DAY) THEN 'Y' ELSE 'N' END AS PWD_EXPIRE,
+					   U.USER_PHONE		AS USER_PHONE,
+					   U.USER_EMAIL,
+					   U.SMS_CODE,
+					   U.SMS_RDATE,
+					   U.LOGINDATE,
+					   U.LOCK_STATUS
+		 FROM PI_USER U, PI_GROUP G, PI_GRADE_USER GU
+		WHERE U.INSA_CODE = G.INSA_CODE
+		  AND U.USER_GRADE = GU.GRADE_NO
+		  AND U.USER_NO = (#{user_no})
+    </select>
+
+	<select id="selectTeamMember" parameterType="hashmap" resultType="hashmap">
+		SELECT U.USER_NO, U.JIKWEE, U.JIKGUK, U.BOSS_NAME, U.USER_GRADE, U.USER_NAME, U.INSA_CODE, G.TEAM_NAME, U.REGDATE
+		  FROM PI_USER U, PI_GROUP G
+		 WHERE U.INSA_CODE = G.INSA_CODE 
+		   AND U.INSA_CODE = #{insa_code}
+		   AND U.USER_NO != #{user_no}
+	</select>
+	
+	<select id="selectTeamManager" parameterType="hashmap" resultType="hashmap">
+		SELECT U.USER_NO, U.JIKWEE, U.JIKGUK, U.USER_GRADE, U.USER_NAME, U.INSA_CODE
+		  FROM PI_USER U
+		 WHERE U.USER_NAME = (SELECT Z.BOSS_NAME FROM PI_USER Z WHERE Z.USER_NO = #{value})
+	</select>
+ 
+	<update id="updatePassword" parameterType="hashmap">
+		UPDATE PI_USER SET
+			PASSWORD = SHA2(HEX(#{newPasswd}),256),
+			PWD_UPT_DT = NOW()
+		 WHERE USER_NO = #{user_no}
+		   AND PASSWORD = SHA2(HEX(#{oldPassword}),256)
+	</update>	
+	
+	<insert id="insertLog" parameterType="hashmap">
+		INSERT INTO pi_userlog
+		(USER_NO, MENU_NAME, JOB_INFO, USER_IP, REGDATE, MILLISECOND, LOG_FLAG)
+		VALUES
+		(#{user_no}, #{menu_name}, #{job_info}, #{user_ip}, NOW(), DATE_FORMAT(NOW(6), '%f'), #{logFlag})
+	</insert>
+	
+	<select id="selectTarget" resultType="pi_targetVO">
+		SELECT t.name,t.platform,g.name,g.search_time,t.matchcnt,t.search_status,t.regdate FROM pi_groupall g, pi_targets t WHERE g.group_id = t.group_id
+	</select>
+
+	<select id="selectUserLogList" resultType="hashmap">
+		SELECT  L.USER_NO, L.JOB_INFO, L.USER_IP, L.MENU_NAME,
+      			DATE_FORMAT(L.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE,
+      			U.USER_NAME
+		  FROM PI_USERLOG L, PI_USER U
+		 WHERE U.USER_NO = L.USER_NO 
+		<if test="userNo != null and userNo != ''">
+		   AND L.USER_NO LIKE CONCAT('%', #{userNo}, '%')
+		</if>
+		<if test="userName != null and userName != ''">
+		   AND U.USER_NAME LIKE CONCAT('%', #{userName}, '%')
+		</if>
+		<if test="userIP != null and userIP != ''">
+		   AND L.USER_IP LIKE CONCAT('%', #{userIP}, '%')
+		</if>
+		<if test="fromDate != null and toDate != null">  
+		   AND L.REGDATE BETWEEN CONCAT(#{fromDate},' 00:00:00') AND CONCAT(#{toDate} ,' 23:59:59')
+		</if>
+		<if test="logFlag != null and logFlag != ''">  
+		   AND L.LOG_FLAG = #{logFlag}
+		</if>
+		 ORDER BY REGDATE DESC
+	</select>
+	
+	<select id="selectAccessIP" parameterType="String" resultType="String">
+		SELECT U.ACCESS_IP
+		  FROM PI_USER U
+		 WHERE U.USER_NO = #{user_no}
+	</select>
+	
+	<select id="selectNotice" resultType="hashmap">
+		SELECT
+			NOTICE_ID AS IDX, USER_NO, NOTICE_TITLE, NOTICE_CON, NOTICE_CHK,
+			DATE_FORMAT(REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE 
+		FROM PI_NOTICE 
+		ORDER BY IDX DESC
+		LIMIT 1
+	</select>
+	
+	<!-- 공지사항 목록 조회 -->
+	<select id="noticeList" resultType="hashmap">
+		SELECT * FROM
+		(SELECT NULL AS NUM,
+		       NOTICE_ID AS IDX, 
+		       NF.NOTICE_FILE_ID, 
+		       NF.FILE_NAME, NF.REAL_FILE_NAME, 
+		         CASE WHEN NF.NOTICE_FILE_ID IS NULL THEN 0 ELSE 1 END AS FILE_CHK,
+		       N.USER_NO, 
+		       NOTICE_TITLE, 
+		       NOTICE_CON, 
+		       NOTICE_CHK,
+		       DATE_FORMAT(N.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, U.USER_NAME
+		FROM PI_NOTICE N
+		   LEFT OUTER JOIN PI_NOTICE_FILE NF ON N.NOTICE_FILE_ID = NF.NOTICE_FILE_ID
+		   ,pi_user U  
+		WHERE N.USER_NO = U.USER_NO
+		      AND N.NOTICE_CHK = 0
+        GROUP BY REGDATE
+		ORDER BY REGDATE DESC) D
+		      
+		UNION ALL
+		
+		SELECT * FROM
+		(SELECT NOTICE_ID AS NUM,
+		       NOTICE_ID AS IDX, 
+		       NF.NOTICE_FILE_ID, 
+		       NF.FILE_NAME, NF.REAL_FILE_NAME, 
+		         CASE WHEN NF.NOTICE_FILE_ID IS NULL THEN 0 ELSE 1 END AS FILE_CHK,
+		       N.USER_NO, 
+		       NOTICE_TITLE, 
+		       NOTICE_CON, 
+		       NOTICE_CHK,
+		       DATE_FORMAT(N.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, U.USER_NAME
+		FROM PI_NOTICE N
+		   LEFT OUTER JOIN PI_NOTICE_FILE NF ON N.NOTICE_FILE_ID = NF.NOTICE_FILE_ID
+		   ,pi_user U  
+		WHERE N.USER_NO = U.USER_NO
+		   -- AND N.NOTICE_CHK = 1
+		GROUP BY REGDATE
+		ORDER BY NUM DESC) S
+	</select>
+	
+	<!-- 공지사항 검색 목록 조회 -->
+	<select id="getStatusList" parameterType="hashmap" resultType="hashmap">
+		SELECT * FROM
+		(SELECT NULL AS NUM,
+		       NOTICE_ID AS IDX, 
+		       NF.NOTICE_FILE_ID, 
+		       NF.FILE_NAME, NF.REAL_FILE_NAME, 
+		         CASE WHEN NF.NOTICE_FILE_ID IS NULL THEN 0 ELSE 1 END AS FILE_CHK,
+		       N.USER_NO, 
+		       NOTICE_TITLE, 
+		       NOTICE_CON, 
+		       NOTICE_CHK,
+		       DATE_FORMAT(N.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, U.USER_NAME
+		FROM PI_NOTICE N
+		   LEFT OUTER JOIN PI_NOTICE_FILE NF ON N.NOTICE_FILE_ID = NF.NOTICE_FILE_ID
+		   ,pi_user U  
+		WHERE N.USER_NO = U.USER_NO
+		      AND N.NOTICE_CHK = 0
+        GROUP BY REGDATE
+		ORDER BY REGDATE DESC) D
+
+		UNION ALL
+
+		SELECT * FROM
+		(SELECT NOTICE_ID AS NUM,
+		       NOTICE_ID AS IDX, 
+		       NF.NOTICE_FILE_ID, 
+		       NF.FILE_NAME, NF.REAL_FILE_NAME, 
+		         CASE WHEN NF.NOTICE_FILE_ID IS NULL THEN 0 ELSE 1 END AS FILE_CHK,
+		       N.USER_NO, 
+		       NOTICE_TITLE, 
+		       NOTICE_CON, 
+		       NOTICE_CHK,
+		       DATE_FORMAT(N.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, U.USER_NAME
+		FROM PI_NOTICE N
+		   LEFT OUTER JOIN PI_NOTICE_FILE NF ON N.NOTICE_FILE_ID = NF.NOTICE_FILE_ID
+		   ,pi_user U  
+		WHERE N.USER_NO = U.USER_NO
+		   -- AND N.NOTICE_CHK = 1
+		GROUP BY REGDATE
+		ORDER BY NUM DESC) S
+		WHERE 1=1
+		<if test="title != null and title != ''">
+			AND NOTICE_TITLE LIKE CONCAT('%', #{title}, '%')
+		</if>
+		<if test="titcont != null and titcont != ''">
+			AND NOTICE_CON LIKE CONCAT('%', #{titcont}, '%')
+		</if>
+		<if test="writer != null and writer != ''">
+			AND USER_NAME LIKE CONCAT('%', #{writer}, '%')
+		</if>
+		<if test='fromDate != null and toDate != null and regdateChk == "Y"'>  
+		   AND REGDATE BETWEEN CONCAT(#{fromDate},' 00:00:00') AND CONCAT(#{toDate} ,' 23:59:59')
+		</if>
+	</select>
+	
+	<!-- 공지사항 등록 -->
+	<insert id="noticeInsert" parameterType="hashmap">
+		INSERT INTO PI_NOTICE
+		(USER_NO, NOTICE_FILE_ID, NOTICE_TITLE, NOTICE_CON, NOTICE_CHK, REGDATE)
+		VALUES
+		(#{userNo}, #{notice_file_id}, #{noticeTitle}, #{noticeCon}, 
+		
+		<if test="CHK == 1">
+			1, 
+		</if>
+		<if test="CHK == 0">
+			0, 
+		</if>
+		NOW())
+	</insert>
+	
+	<!-- 공지사항 수정 -->
+	<update id="noticeUpdate" parameterType="hashmap">
+		UPDATE PI_NOTICE
+		   SET NOTICE_TITLE = #{noticeTitle}
+		   	  ,NOTICE_CON = #{noticeCon}
+	   	   	  ,NOTICE_CHK = #{CHK}
+   	   	   <if test="file_number != null and file_number != ''">
+			  ,NOTICE_FILE_ID = #{file_number}
+		   </if>
+		 WHERE 1 = 1
+		 	   AND NOTICE_ID = #{IDX}
+	</update>	
+	
+	<!-- 공지사항 삭제 -->
+	<delete id="noticeDelete" parameterType="hashmap">
+		DELETE FROM PI_NOTICE
+		WHERE 1 = 1
+		  AND NOTICE_ID = #{IDX}
+	</delete>	
+	
+	<insert id="changeNotice" parameterType="hashmap">
+		INSERT INTO PI_NOTICE
+		(USER_NO, NOTICE_TITLE, NOTICE_CON, NOTICE_CHK, REGDATE)
+		VALUES
+		(#{userNo}, #{noticeTitle}, #{noticeCon}, #{noticeChk}, NOW())
+	</insert>
+	
+	<select id="selectDownload" resultType="hashmap">
+		SELECT
+			DOWNLOAD_ID AS IDX, USER_NO, DOWNLOAD_TITLE, DOWNLOAD_CON,
+			DATE_FORMAT(REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE 
+		FROM PI_DOWNLOAD 
+		ORDER BY IDX DESC
+		LIMIT 1
+	</select>
+	
+	<select id="downloadList" resultType="hashmap">
+		SELECT * FROM
+			(SELECT DOWNLOAD_ID AS NUM,
+			       DOWNLOAD_ID AS IDX, 
+			       DF.DOWNLOAD_FILE_ID, 
+			       DF.FILE_NAME, 
+					 DF.REAL_FILE_NAME, 
+			         CASE WHEN DF.DOWNLOAD_FILE_ID IS NULL THEN 0 ELSE 1 END AS FILE_CHK,
+			       D.USER_NO, 
+			       DOWNLOAD_TITLE, 
+			       DOWNLOAD_CON, 
+			       DATE_FORMAT(D.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+					 U.USER_NAME
+			FROM PI_DOWNLOAD D
+			   LEFT OUTER JOIN PI_DOWNLOAD_FILE DF ON D.DOWNLOAD_FILE_ID = DF.DOWNLOAD_FILE_ID
+			   ,pi_user U  
+			WHERE D.USER_NO = U.USER_NO
+	        GROUP BY REGDATE
+			ORDER BY REGDATE DESC) A
+	</select>
+	
+	<select id="getStatusDownloadList" parameterType="hashmap" resultType="hashmap">
+		SELECT * FROM
+			(SELECT DOWNLOAD_ID AS NUM,
+			       DOWNLOAD_ID AS IDX, 
+			       DF.DOWNLOAD_FILE_ID, 
+			       DF.FILE_NAME, 
+					 DF.REAL_FILE_NAME, 
+			         CASE WHEN DF.DOWNLOAD_FILE_ID IS NULL THEN 0 ELSE 1 END AS FILE_CHK,
+			       D.USER_NO, 
+			       DOWNLOAD_TITLE, 
+			       DOWNLOAD_CON, 
+			       DATE_FORMAT(D.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+					 U.USER_NAME
+			FROM PI_DOWNLOAD D
+			   LEFT OUTER JOIN PI_DOWNLOAD_FILE DF ON D.DOWNLOAD_FILE_ID = DF.DOWNLOAD_FILE_ID
+			   ,pi_user U  
+			WHERE D.USER_NO = U.USER_NO
+	        GROUP BY REGDATE
+			ORDER BY REGDATE DESC) A
+		WHERE 1=1
+		<if test="title != null and title != ''">
+			AND DOWNLOAD_TITLE LIKE CONCAT('%', #{title}, '%')
+		</if>
+		<if test="titcont != null and titcont != ''">
+			AND DOWNLOAD_CON LIKE CONCAT('%', #{titcont}, '%')
+		</if>
+		<if test="writer != null and writer != ''">
+			AND USER_NAME LIKE CONCAT('%', #{writer}, '%')
+		</if>
+		<if test='fromDate != null and toDate != null and regdateChk == "Y"'>
+		   AND REGDATE BETWEEN CONCAT(#{fromDate},' 00:00:00') AND CONCAT(#{toDate} ,' 23:59:59')
+		</if>
+	</select>
+	
+	<insert id="downloadInsert" parameterType="hashmap">
+		INSERT INTO PI_DOWNLOAD
+		(USER_NO, DOWNLOAD_FILE_ID, DOWNLOAD_TITLE, DOWNLOAD_CON, REGDATE)
+		VALUES
+		(#{userNo}, #{download_file_id}, #{downloadTitle}, #{downloadCon}, NOW())
+	</insert>
+	
+	<update id="downloadUpdate" parameterType="hashmap">
+		UPDATE PI_DOWNLOAD
+		   SET DOWNLOAD_TITLE = #{downloadTitle}
+		   	  ,DOWNLOAD_CON = #{downloadCon}
+   	   	   <if test="file_number != null and file_number != ''">
+			  ,DOWNLOAD_FILE_ID = #{file_number}
+		   </if>
+		 WHERE 1 = 1
+		 	   AND DOWNLOAD_ID = #{IDX}
+	</update>
+	
+	<delete id="downloadDelete" parameterType="hashmap">
+		DELETE FROM PI_DOWNLOAD
+		WHERE 1 = 1
+		  AND DOWNLOAD_ID = #{IDX}
+	</delete>	
+	
+	<update id="changeAccessIP" parameterType="hashmap">
+		UPDATE PI_USER
+		  SET ACCESS_IP = #{accessIP}
+		 WHERE USER_NO = #{userNo}
+	</update>	
+	
+	<select id="selectManagerList" resultType="hashmap">
+		SELECT DISTINCT 
+			U.USER_GRADE AS CHKBOX, U.USER_PHONE_STATUS, U.USER_EMAIL,
+			U.USER_NO, U.JIKWEE, U.JIKGUK, U.BOSS_NAME, U.USER_NAME, U.INSA_CODE,
+			(SELECT G.TEAM_NAME FROM PI_GROUP G WHERE G.INSA_CODE = U.INSA_CODE) AS TEAM_NAME, 
+			DATE_FORMAT(U.REGDATE, '%Y-%m-%d %h:%i:%s' ) AS REGDATE,
+			DATE_FORMAT(U.STARTDATE, '%Y-%m-%d' ) AS STARTDATE,
+			DATE_FORMAT(U.ENDDATE, '%Y-%m-%d' ) AS ENDDATE,
+			U.USER_GRADE, U.USER_GRADE AS OLD_USER_GRADE,
+			IFNULL(U.USER_PHONE, '') AS USER_PHONE,
+			if(NOW() > LOCK_DATE, 'N', 'Y') AS LOCK_ACCOUNT,
+			U.ACCESS_IP,
+			U.LOCK_STATUS,
+			DATE_FORMAT(U.LOGINDATE, '%Y-%m-%d' ) AS LOGINDATE,
+			DATE_FORMAT(DATE_SUB(U.LOGINDATE, INTERVAL 3 MONTH), '%Y-%m-%d') AS LOGINDATE2,
+			U.UNLOCK_REASON,
+			'' AS MEMBER_STATUS,
+			U.ACC_YN,
+			(CASE WHEN U.ACC_YN = 'Y' THEN '재직자' ELSE '퇴직자' END) AS ACC_YN_NM,
+			LOCK_EMAIL
+		FROM PI_USER U 
+		WHERE 1 = 1
+		#AND U.USER_GRADE != '9'
+	</select>
+	
+	<update id="changeManagerList" parameterType="hashmap">
+		UPDATE PI_USER
+		   SET USER_GRADE = #{userGrade}
+		   <if test="userGrade == 2 || userGrade == 3">
+		   	 ,LOGINDATE =  DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00'), INTERVAL 3 MONTH)
+		   </if>
+		   
+		 WHERE USER_NO = #{userNo}
+	</update>	
+	
+	<update id="changeUserDate" parameterType="hashmap">
+		<!-- UPDATE PI_USER
+		   SET
+		     USER_NAME = #{userNm},
+		     STARTDATE = #{accountFormDate},
+		   	 ENDDATE = #{accountToDate}
+		   	 <if test="userPwd != ''">
+		   	 	,PASSWORD=SHA2(HEX(#{userPwd}),256)
+		   	 	,PWD_UPT_DT = NOW()
+		   	 </if>
+		 WHERE USER_NO = #{userNo} -->
+		UPDATE PI_USER
+		   SET
+		     USER_NAME = #{userNm},
+		     STARTDATE = #{accountFormDate},
+		   	 ENDDATE = #{accountToDate}
+		   	 <if test="changePhoneNM != ''">
+		   	 	,USER_PHONE= #{changePhoneNM}
+		   	 	,USER_PHONE_STATUS = 1
+		   	 </if>
+		   	 <if test="changeEmail != '' || changeEmail != null">
+		   	 	,USER_EMAIL = #{changeEmail}
+		   	 </if>
+		   	 ,ACCESS_IP = #{popupChangeAccessIP}
+		   	 ,LOCK_EMAIL = #{lock_email}
+		 WHERE USER_NO = #{userNo}
+	</update>	
+	
+	<delete id="userDelete" parameterType="hashmap">
+		DELETE FROM PI_USER
+		 WHERE USER_NO = #{userNo}
+	</delete>	
+	
+	<select id="selectTeamCode" resultType="hashmap">
+		SELECT DISTINCT INSA_CODE AS INSA_CODE, TEAM_NAME AS TEAM_NAME 
+		FROM PI_GROUP
+		WHERE TEAM_NAME IS NOT NULL
+	</select>	
+	
+	<select id="chkDuplicateUserNo" resultType="hashmap">
+		SELECT COUNT(*) EXISTUSERCNT 
+		  FROM PI_USER
+		 WHERE USER_NO = #{userNo}
+	</select>	
+	
+	<insert id="createTeam" parameterType="hashmap">
+		INSERT INTO PI_GROUP
+			(INSA_CODE, TEAM_NAME) 
+		VALUES 
+			(#{teamCode}, #{teamName});
+	</insert>
+	
+	<insert id="createUser" parameterType="hashmap">
+		INSERT INTO PI_USER
+			(USER_NO, USER_NAME, PASSWORD, INSA_CODE, USER_GRADE, JIKWEE, JIKGUK, REGDATE, STARTDATE, ENDDATE, PWD_UPT_DT, USER_EMAIL, USER_PHONE) 
+		VALUES 
+			(#{userNo}, #{userName}, SHA2(HEX(#{password}),256), #{team}, #{grade}, #{jikwee}, #{jikguk}, NOW(), #{startDate}, #{endDate}, NOW(), #{userEmail}, #{userPhone});
+	</insert>
+	
+	<!-- <insert id="createAccountInfo" parameterType="hashmap">
+		INSERT INTO PI_ACCOUNT_INFO
+			(SVR_HOST, ACCOUNT, USER_ID, OFFICE_CODE, OFFICE_NM, DEP_CODE, DEP_NM, CREATE_DT)
+		VALUES
+			('SVR_HOST', 'ACCOUNT', #{userNo}, #{team}, (select team_name from pi_group where insa_code = #{team}),  #{team}, (select team_name from pi_group where insa_code = #{team}), NOW())
+	</insert> -->
+	
+	<select id="selectAccountOfficeList" resultType="hashmap">
+		SELECT OFFICE_CODE,
+			   OFFICE_NM
+		  FROM PI_ACCOUNT_INFO
+		 WHERE OFFICE_CODE IS NOT NULL
+		   AND OFFICE_NM IS NOT NULL
+		   AND OFFICE_NM LIKE '%팀'
+		GROUP BY OFFICE_CODE, OFFICE_NM
+		ORDER BY OFFICE_NM ASC
+	</select>
+	
+	<select id="sumApproval" resultType="hashmap" parameterType="hashmap">
+		SELECT 
+			(SELECT COUNT(DISTINCT DPCG.data_processing_charge_id)
+			FROM PI_DATA_PROCESSING_CHARGE_GROUP AS DPCG
+		       LEFT OUTER JOIN PI_USER AS PU ON PU.USER_NO = DPCG.USER_NO
+		       LEFT OUTER JOIN pi_data_processing_group AS DPG ON DPCG.data_processing_charge_id = DPG.data_processing_charge_id
+			WHERE DPCG.APPROVAL_STATUS = 'W'
+			AND (DPCG.USER_NO = #{userNo} OR DPCG.OK_USER_NO = #{userNo})
+			) AS search_approval,
+			(SELECT COUNT(DISTINCT path_ex_charge_id)
+			FROM PI_PATH_EXCEPTION_CHARGE AS PEC
+		   		LEFT OUTER JOIN PI_USER AS PU ON PU.USER_NO = PEC.USER_NO
+			WHERE PEC.STATUS = 'W'
+				AND (PEC.USER_NO = #{userNo} OR PEC.OK_USER_NO = #{userNo})
+			) AS exception_approval,
+			(SELECT COUNT(DISTINCT T.NAME)
+			FROM PI_CHARGE_UPDATE AS CU
+				,PI_TARGETS AS T
+			WHERE T.TARGET_ID = CU.TARGET_ID
+				AND (CU.APPROVAL_STATUS = 'W' OR CU.APPROVAL_STATUS IS NULL OR CU.APPROVAL_STATUS = '')
+				AND CU.OK_USER_NO = #{userNo}
+			) AS change_list,
+			(SELECT COUNT(DISTINCT P.IDX)
+			FROM PI_EXCEPTION P
+			WHERE (P.APPROVAL_STATUS = 'W' OR P.APPROVAL_STATUS IS NULL OR P.APPROVAL_STATUS = '')
+				AND P.OK_USER_NO = #{userNo}
+			) AS path_change
+		FROM DUAL
+	</select>	
+	
+	<select id="getLogFlagList" resultType="hashmap">
+		SELECT
+			 FLAG
+			,FLAG_NAME
+		FROM PI_USERLOG_FLAG
+		ORDER BY FLAG ASC
+	</select>
+	
+	<select id="selectSMSCode" parameterType="hashmap">
+		SELECT DISTINCT U.USER_NO, 
+					   U.USER_PHONE,
+	   				   U.JIKWEE, 
+	   				   U.JIKGUK, 
+	   				   U.BOSS_NAME, 
+	   				   U.USER_GRADE, 
+	   				   U.USER_NAME, 
+	   				   U.INSA_CODE, 
+	   				   G.TEAM_NAME, 
+	   				   U.REGDATE,
+					   CASE WHEN U.PASSWORD = SHA2(HEX(#{password}),256) THEN 'Y' ELSE 'N' END AS PASSWORD,
+					   U.USER_GRADE, 
+					   REPLACE(IFNULL(U.ACCESS_IP, ''), ' ', '') AS ACCESS_IP,
+					   (SELECT ACC.OFFICE_NM FROM PI_ACCOUNT_INFO ACC WHERE ACC.USER_ID = U.USER_NO LIMIT 1) AS OFFICE_NM,
+					   U.ENDDATE,
+					   <!-- DATE_FORMAT(U.ENDDATE, '%Y-%m-%d %H:%i:%S') AS ENDDATE, -->
+					   U.STARTDATE,
+					   U.FAILED_COUNT,
+					   if(NOW() > LOCK_DATE, 'N', 'Y') LOCK_ACCOUNT,
+					   CASE WHEN U.PWD_UPT_DT &lt; DATE_ADD(NOW(), INTERVAL -90 DAY) THEN 'Y' ELSE 'N' END AS PWD_EXPIRE
+		 FROM PI_USER U, PI_GROUP G
+		WHERE U.INSA_CODE = G.INSA_CODE
+		  AND U.USER_NO = (#{user_no})
+		  AND U.SMS_CODE = #{smsCode}
+	</select>	
+	
+	<update id="updateSMSCode" parameterType="hashmap">
+		UPDATE PI_USER
+		   SET
+		     SMS_CODE = #{smsCode},
+		     SMS_RDATE = NOW()
+		 WHERE USER_NO = #{user_no}
+	</update>
+	
+	<select id="selectSmsMember" parameterType="hashmap" resultType="hashmap">
+	   SELECT DISTINCT U.USER_NO, 
+	   				   U.JIKWEE, 
+	   				   U.JIKGUK, 
+	   				   U.BOSS_NAME, 
+	   				   U.USER_GRADE, 
+	   				   U.USER_NAME, 
+	   				   U.INSA_CODE, 
+	   				   G.TEAM_NAME, 
+	   				   U.REGDATE,
+					   U.USER_GRADE, 
+					   REPLACE(IFNULL(U.ACCESS_IP, ''), ' ', '') AS ACCESS_IP,
+					   (SELECT ACC.OFFICE_NM FROM PI_ACCOUNT_INFO ACC WHERE ACC.USER_ID = U.USER_NO LIMIT 1) AS OFFICE_NM,
+					   U.ENDDATE,
+					   <!-- DATE_FORMAT(U.ENDDATE, '%Y-%m-%d %H:%i:%S') AS ENDDATE, -->
+					   U.STARTDATE,
+					   U.FAILED_COUNT,
+					   if(NOW() > LOCK_DATE, 'N', 'Y') LOCK_ACCOUNT,
+					   CASE WHEN U.PWD_UPT_DT &lt; DATE_ADD(NOW(), INTERVAL -90 DAY) THEN 'Y' ELSE 'N' END AS PWD_EXPIRE
+		 FROM PI_USER U, PI_GROUP G
+		WHERE U.INSA_CODE = G.INSA_CODE
+		  AND U.USER_NO = (#{user_no})
+		  AND U.SMS_CODE = #{sms_code}
+	</select>	
+	
+	<select id="setHeader" parameterType="hashmap" resultType="hashmap">
+	   SELECT 
+			 GH.GRADE_NO 	AS GRADE_NO
+			,HI.IDX			AS IDX
+			,HI.HEADER_NO	AS HEADER_NO
+			,HI.SUB_NO		AS SUB_NO
+			,HI.HEADER_NAME	AS NAME
+			,HI.URL			AS URL
+		FROM PI_GRADE_HEADER GH, PI_HEADER_INFORMATION HI
+		WHERE GH.HEADER_IDX = HI.IDX
+			AND GH.GRADE_NO = #{USER_GRADE}
+		ORDER BY HI.HEADER_NO, HI.SUB_NO
+	</select>	
+	
+	<select id="setPageData" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+			  HI.URL			AS URL
+			 ,GU.ACCESS_DASH	AS MAIN
+		FROM PI_GRADE_USER GU
+			LEFT OUTER JOIN PI_GRADE_HEADER GH ON GU.GRADE_NO = GH.GRADE_NO AND GH.DEFAULT = 'Y' 
+			LEFT OUTER JOIN PI_HEADER_INFORMATION HI ON HI.IDX = GH.HEADER_IDX 
+		WHERE 1=1 
+			AND GU.GRADE_NO = #{USER_GRADE}
+	</select>	
+	
+	<update id="setSmsCode" parameterType="hashmap">
+		UPDATE PI_USER
+		   SET
+		     SMS_CODE = null,
+		     SMS_RDATE = null
+		 WHERE USER_NO = #{user_no}
+	</update>	
+	
+	<update id="changeUserSettingDate" parameterType="hashmap">
+		UPDATE pi_user U
+		SET U.USER_NAME = #{changeUserSettingNM}
+			,U.USER_PHONE = #{changeUserSettingPhoneNM}
+			 ,U.USER_EMAIL = #{changeUserSettingEmail}
+			 <if test="changeUserSettingpassword != null and changeUserSettingpassword != ''">
+				,U.PASSWORD = SHA2(HEX(#{changeUserSettingpassword}),256)
+			</if>
+		WHERE U.USER_NO = #{userNo}
+	</update>
+	
+	<select id="selectChangeMember" parameterType="hashmap" resultType="hashmap">
+	   SELECT DISTINCT U.USER_NO, 
+	   				   U.JIKWEE, 
+	   				   U.JIKGUK, 
+	   				   U.BOSS_NAME, 
+	   				   U.USER_GRADE, 
+	   				   U.USER_NAME, 
+	   				   U.INSA_CODE, 
+	   				   G.TEAM_NAME, 
+	   				   U.REGDATE,
+	   				   'Y' AS PASSWORD,
+					   U.USER_GRADE, 
+					   GU.GRADE_NAME,
+					   REPLACE(IFNULL(U.ACCESS_IP, ''), ' ', '') AS ACCESS_IP,
+					   (SELECT ACC.OFFICE_NM FROM PI_ACCOUNT_INFO ACC WHERE ACC.USER_ID = U.USER_NO LIMIT 1) AS OFFICE_NM,
+					   U.ENDDATE,
+					   <!-- DATE_FORMAT(U.ENDDATE, '%Y-%m-%d %H:%i:%S') AS ENDDATE, -->
+					   U.STARTDATE,
+					   U.FAILED_COUNT,
+					   if(NOW() > LOCK_DATE, 'N', 'Y') LOCK_ACCOUNT,
+					   CASE WHEN U.PWD_UPT_DT &lt; DATE_ADD(NOW(), INTERVAL -90 DAY) THEN 'Y' ELSE 'N' END AS PWD_EXPIRE,
+					   U.USER_PHONE		AS USER_PHONE,
+					   U.SMS_CODE,
+					   U.SMS_RDATE,
+					   U.SOSOK,
+					   U.USER_PHONE,
+					   U.USER_EMAIL,
+					   PWD_RESET_STATUS,
+					   U.LOGINDATE
+		 FROM PI_USER U, PI_GROUP G, PI_GRADE_USER GU
+		WHERE U.INSA_CODE = G.INSA_CODE
+		  AND U.USER_GRADE = GU.GRADE_NO
+		  AND U.USER_NO = (#{userNo})
+	</select>
+	
+	<select id="selectMemberTeam" resultType="hashmap">
+		SELECT DISTINCT INSA_CODE AS INSA_CODE, TEAM_NAME AS TEAM_NAME 
+		FROM PI_GROUP
+		WHERE TEAM_NAME IS NOT NULL
+	</select>
+	
+	<select id="selectPCAdmin" parameterType="hashmap" resultType="hashmap">
+		SELECT U.USER_NO, U.USER_NAME, U.INSA_CODE, U.SOSOK AS TEAM_NAME, U.USER_PHONE, U.USER_EMAIL FROM PI_USER U
+		WHERE 1 = 1 
+		  AND U.USER_NO IN 
+		  <foreach collection="user_no" item="item" open="(" close=")" separator=",">
+		  	#{item}
+		  </foreach>
+	</select>
+	
+	<update id="updatemember" parameterType="hashmap">
+		UPDATE pi_user U SET
+			U.LOGINDATE = DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00'), INTERVAL 3 MONTH)
+		WHERE U.USER_NO = #{user_no}
+		#	AND U.LOGINDATE != DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00'), INTERVAL 3 MONTH)
+	</update>
+	
+	<update id="updateLockMember" parameterType="hashmap">
+		UPDATE pi_user U SET
+			U.LOCK_STATUS = 1
+		WHERE U.USER_NO = #{user_no}
+			AND U.LOGINDATE != DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00'), INTERVAL 3 MONTH)
+	</update>
+	
+	<update id="lockMemberRequest" parameterType="hashmap">
+		UPDATE pi_user U SET
+			U.LOCK_STATUS = ${lock_staus}
+		   ,U.UNLOCK_REASON = #{unlock_reson}
+		WHERE U.USER_NO = #{user_no}
+			AND U.LOGINDATE &lt; NOW()
+			AND U.LOCK_STATUS != ${lock_staus}
+	</update>
+	
+	<update id="unlockMemberRequest" parameterType="hashmap">
+		UPDATE pi_user U SET
+			U.LOCK_STATUS = ${lock_staus}
+			<if test='lock_staus == 0'>
+				,U.LOGINDATE = DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00'), INTERVAL 3 MONTH)
+				,U.UNLOCK_REASON = NULL
+       		</if>
+		WHERE U.USER_NO = #{user_no}
+	</update>
+	
+	<select id="selectLockManagerList" resultType="hashmap">
+		SELECT * 
+		FROM (SELECT DISTINCT 
+					   U.USER_NO, 
+					   U.USER_NAME,
+					   U.USER_EMAIL,
+						IFNULL(U.USER_PHONE, '') AS USER_PHONE,
+						U.JIKGUK,
+						(SELECT G.TEAM_NAME FROM PI_GROUP G WHERE G.INSA_CODE = U.INSA_CODE) AS TEAM_NAME,
+						DATE_FORMAT(U.REGDATE, '%Y-%m-%d %h:%i:%s' ) AS REGDATE,
+						DATE_FORMAT(U.STARTDATE, '%Y-%m-%d' ) AS STARTDATE,
+						DATE_FORMAT(U.ENDDATE, '%Y-%m-%d' ) AS ENDDATE,
+						DATE_FORMAT(U.LOCK_DATE, '%Y-%m-%d' ) AS LOCK_DATE,
+						U.USER_GRADE,
+						U.USER_GRADE AS OLD_USER_GRADE,
+						if(NOW() > LOCK_DATE, 'N', 'Y') AS LOCK_ACCOUNT,
+						'' AS MEMBER_STATUS,
+						U.LOCK_STATUS,
+						DATE_FORMAT(U.LOGINDATE, '%Y-%m-%d' ) AS LOGINDATE
+				FROM PI_USER U 
+				WHERE 1 = 1
+					AND DATE_FORMAT(U.LOGINDATE, '%Y-%m-%d' ) &lt; DATE_FORMAT(NOW(), '%Y-%m-%d' )
+				)D
+		WHERE 1=1
+		<if test='lock_status != null and lock_status != ""'>
+            AND D.LOCK_STATUS = #{lock_status}
+        </if>
+        <if test='user_no != null and user_no != ""'>
+			AND D.USER_NO LIKE concat('%', #{user_no}, '%')
+		</if>
+        <if test='user_name != null and user_name != ""'>
+		  	AND D.USER_NAME LIKE concat('%', #{user_name}, '%')
+		</if>
+        <if test='team_name != null and team_name != ""'>
+		  	AND D.TEAM_NAME LIKE concat('%', #{team_name}, '%')
+		</if>
+	</select>
+	
+	<select id="selectAccoutnLockMember" resultType="hashmap">
+		SELECT USER_NO, USER_NAME, USER_PHONE
+		FROM pi_user U
+		WHERE U.USER_NO = #{user_no}
+	</select>
+	
+	<select id="selectAdminMember" resultType="hashmap">
+		SELECT USER_NO, USER_NAME, USER_PHONE
+		FROM pi_user U
+		WHERE U.USER_GRADE = '9'
+	</select>
+	
+	<select id="selectSMSFlag" parameterType="String" resultType="String">
+		SELECT FLAG 
+		FROM pi_template 
+		WHERE IDX = '1'
+	</select>
+	
+	<update id="updateSMSFlag" parameterType="hashmap">
+		UPDATE pi_template
+		SET FLAG = CASE WHEN FLAG = 'Y' THEN 'N' ELSE 'Y' END
+		WHERE IDX = '1'
+	</update>
+</mapper>

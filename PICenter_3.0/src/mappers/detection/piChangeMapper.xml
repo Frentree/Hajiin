@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.detection.dao.piChangeDAO">
+    
+    <select id="selectChangeList" parameterType="hashmap" resultType="hashmap">
+        SELECT IDX,
+               T.NAME AS HOST, 
+               CU.TARGET_ID,
+               CU.HASH_ID,
+               CU.PATH, 
+               CU.REG_USER_NO, 
+               CU.OK_USER_NO, 
+               (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = CU.REG_USER_NO) AS REG_USER_NAME,
+               (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = CU.OK_USER_NO) AS OK_USER_NAME,    
+               DATE_FORMAT(CU.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+               DATE_FORMAT(CU.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE,
+               CU.APPROVAL_STATUS, 
+               #CU.REASON,
+               (CASE WHEN CU.APPROVAL_STATUS='D' THEN CU.RETURN_REASON ELSE CU.REASON END)		AS REASON,		# 반려일 경우는 RETURN_REASON 값 출력하도록 변경
+               CU.RETURN_REASON
+          FROM PI_CHARGE_UPDATE AS CU
+              ,PI_TARGETS AS T
+         WHERE T.TARGET_ID = CU.TARGET_ID
+           AND DATE_FORMAT(CU.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test='owner != null and owner != ""'>
+           AND T.NAME LIKE CONCAT('%',#{owner},'%')
+       </if>
+        <if test='filename != null and filename != ""'>
+           AND CU.PATH LIKE CONCAT('%',#{filename},'%')
+       </if>
+
+        <choose>
+            <when test='status != null and status != "" and status == "W"'>
+                AND (CU.APPROVAL_STATUS = #{status} OR CU.APPROVAL_STATUS IS NULL OR CU.APPROVAL_STATUS = '')
+            </when>
+            <otherwise>
+                <if test='status != null and status != ""'>
+                    AND CU.APPROVAL_STATUS = #{status}
+                </if>
+            </otherwise>
+        </choose>
+
+        <if test='request_status == "R"'>
+           AND CU.REG_USER_NO = #{user_no}
+        </if>
+        <if test='request_status != "R"'>
+           AND CU.OK_USER_NO = #{user_no}
+        </if>
+         ORDER BY CU.REGDATE DESC, CU.OKDATE DESC
+    </select>
+
+	<select id="selectPathChangeList" parameterType="hashmap" resultType="hashmap">
+    SELECT P.IDX, 
+         P.GROUP_ID AS PATH, 
+		 P.TARGET_ID, 
+		 P.HASH_ID AS HOST, 
+		 P.APPROVAL_STATUS,
+		 DATE_FORMAT(P.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE,
+		 DATE_FORMAT(P.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE,
+		 P.REG_USER_NO,
+		 (SELECT U.USER_NAME FROM PI_USER U WHERE U.USER_NO = P.REG_USER_NO) AS REG_USER_NAME,
+		 P.OK_USER_NO,
+		 (SELECT U.USER_NAME FROM PI_USER U WHERE U.USER_NO = P.OK_USER_NO) AS OK_USER_NAME,
+		 P.REASON
+	FROM PI_EXCEPTION P
+	WHERE 1=1
+         AND DATE_FORMAT(P.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+       <if test='owner != null and owner != ""'>
+         AND P.HASH_ID LIKE CONCAT('%',#{owner},'%')
+       </if>
+       <if test='filename != null and filename != ""'>
+         AND P.GROUP_ID LIKE CONCAT('%',#{filename},'%')
+       </if>
+
+       <choose>
+          <when test='status != null and status != "" and status == "W"'>
+         AND (P.APPROVAL_STATUS = #{status} OR P.APPROVAL_STATUS IS NULL OR P.APPROVAL_STATUS = '')
+          </when>
+          <otherwise>
+             <if test='status != null and status != ""'>
+         AND P.APPROVAL_STATUS = #{status}
+             </if>
+          </otherwise>
+       </choose>
+
+       <if test='request_status == "R"'>
+           AND P.REG_USER_NO = #{user_no}
+       </if>
+       <if test='request_status != "R"'>
+           AND P.OK_USER_NO = #{user_no}
+       </if>
+         ORDER BY P.REGDATE DESC, P.OKDATE DESC, HOST
+    </select>
+
+    <update id="updateChangeApproval" parameterType="hashmap">
+        UPDATE PI_CHARGE_UPDATE 
+           SET OK_USER_NO = #{ok_user_no},
+               UPDATE_OWNER = #{ok_user_no},
+               OKDATE = NOW(),
+               APPROVAL_STATUS = #{apprType},
+        <if test='apprType == "D"'>
+               return_reason = #{reason}
+        </if>
+        <if test='apprType == "E"'>
+               reason = #{reason}
+        </if>
+         WHERE IDX = #{idx}
+           AND OK_USER_NO = #{ok_user_no}
+    </update>
+    
+    <update id="updatePathChangeApproval" parameterType="hashmap">
+        UPDATE PI_EXCEPTION 
+           SET OKDATE = NOW(),
+               APPROVAL_STATUS = #{apprType},
+               reason = #{reason}
+         WHERE IDX = #{idx}
+           AND OK_USER_NO = #{ok_user_no}
+    </update>
+
+    <update id="updateChangeFind" parameterType="hashmap">
+        UPDATE PI_FIND 
+           SET OWNER = #{ok_user_no}
+         WHERE TARGET_ID = #{target_id}
+           AND HASH_ID = #{hash_id}
+    </update>
+	
+	
+	<insert id="insertUpdateTargetUserByChangeApproval" parameterType="hashmap">
+		INSERT INTO PI_TARGET_USER (
+			user_no,
+			target_id,
+			regdate
+		) VALUES (
+			#{USER_NO},
+			#{TARGET_ID},
+			NOW()
+		) ON DUPLICATE KEY
+			UPDATE REGDATE = REGDATE
+	</insert>
+	
+	
+	
+</mapper>

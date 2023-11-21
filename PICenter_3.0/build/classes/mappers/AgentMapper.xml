@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="agentmapper">
+
+	<!-- mybatis-config.xml의 typeAlias에 등록해두지 않았다면 <select id="selectMember" resultType="com.org.iopts.dto.MemberVO" > SELECT ID, PW ,NAME FROM TEST </select> 이렇게 해야 한다. -->
+	<select id="selectAgent_Info" resultType="com.org.iopts.dto.Pi_AgentVO">
+		SELECT * FROM pi_agents WHERE agent_name = #{host_name};
+	</select>
+	
+	<select id="dashAgent_Info" resultType="com.org.iopts.dto.Pi_AgentVO">
+	    SELECT T.name AS agent_name, T.target_id, 
+               from_unixtime(T.search_time) as agent_started, 
+               A.agent_connected_ip, A.agent_platform_compatibility
+		  FROM pi_targets T  
+		  LEFT
+		 OUTER JOIN pi_agents A
+		    ON T.name = A.agent_name
+         WHERE T.TARGET_ID = #{target_id};
+	</select>
+
+</mapper>

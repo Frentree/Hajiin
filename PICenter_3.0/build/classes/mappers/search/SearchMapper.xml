@@ -1,0 +1,1248 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.search.dao.SearchDAO">
+
+    <insert id="insertProfile" parameterType="hashmap">
+		INSERT INTO pi_datatypes_user (
+			DATATYPE_ID, 
+			DATATYPE_LABEL, 
+			CREATE_USER, 
+			DATATYPE,
+		 	OCR, RECENT,
+		 	CAPTURE,
+		 	AP_NO,
+		 	STD_ID
+		)
+		VALUES (
+			#{datatype_id}, 
+			#{datatype_label}, 
+			#{create_user},
+			#{datatype},
+			#{ocr},
+			#{recent},
+			#{capture},
+			#{ap_no},
+			#{std_id}
+		)
+	</insert>
+    
+    <select id="getProfile" parameterType="hashmap" resultType="hashmap">
+    	SELECT DATATYPE_ID,
+     		STD_ID,
+			DATATYPE_LABEL, 
+			CREATE_USER, 
+			DATATYPE,
+		 	OCR, RECENT,
+		 	CAPTURE
+		FROM PI_AP_SERVER AP, PI_DATATYPES_USER DU
+		WHERE 1=1
+		  AND DU.ENABLE = 1
+		  AND AP.AP_NO = DU.AP_NO
+		  AND AP.AP_NO = 0
+		 <if test="datatype_id != null">
+		  	AND DU.STD_ID = #{datatype_id}
+		  </if>
+		  <if test="name != null">
+		  	AND DU.DATATYPE_LABEL like concat('%', #{name}, '%')
+		  </if>
+		ORDER BY DU.DATATYPE_LABEL
+	</select>
+	
+	<update id="updateProfile" parameterType="hashmap">
+		UPDATE pi_datatypes_user
+		SET
+			DATATYPE_ID = #{datatype_id},
+			DATATYPE_LABEL = #{datatype_label},
+			DATATYPE = #{datatype},
+			OCR=#{ocr},
+			RECENT=#{recent},
+			CAPTURE=#{capture}
+		WHERE 1 = 1
+		  AND STD_ID = #{std_id}
+		  AND AP_NO = #{ap_no}
+		  AND ENABLE = 1
+	</update>
+	
+	<select id="getDatatypesUserSize" parameterType="String" resultType="int">
+		SELECT COUNT(STD_ID) FROM PI_DATATYPES_USER WHERE STD_ID = #{value}
+	</select>
+	
+	<update id="updateStandardId" parameterType="hashmap">
+		UPDATE PI_DATATYPES_USER SET DATATYPE = #{new_std_id} WHERE STD_ID = #{std_id} AND ENABLE = 1
+	</update>
+	
+	<update id="updateDatatypeInPolicy" parameterType="hashmap">
+		UPDATE PI_SCAN_POLICY SET
+		    datatype_id = #{new_std_id}
+     	WHERE datatype_id = #{std_id}
+	</update>
+	
+	<select id="selectDataTypeById" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+			  datatype_id, datatype_label, create_user, regdate, rrn
+			 ,foreigner, driver, passport, account, card
+			 ,phone, mobile_phone, local_phone, email, rrn_cnt, foreigner_cnt
+			 ,driver_cnt, passport_cnt, account_cnt, card_cnt, phone_cnt
+			 ,mobile_phone_cnt, local_phone_cnt, email_cnt, ocr, capture, enable
+		FROM PI_DATATYPES_USER
+     	WHERE DATATYPE_ID = #{DATATYPE_ID}
+     	GROUP BY DATATYPE_ID
+	</select>
+	
+	<update id="deleteProfile" parameterType="hashmap">
+		UPDATE PI_DATATYPES_USER
+		   SET ENABLE = 0
+     	WHERE STD_ID = #{DATATYPE_ID}
+	</update>
+	
+	<select id="getPolicy" parameterType="hashmap" resultType="hashmap">
+     	SELECT
+			 SP.IDX 	AS IDX
+			,SP.POLICY_NAME		AS NAME 
+			,SP.COMMENT			AS COMMENT
+			,DU.datatype_label	AS TYPE
+			,DU.datatype_label	AS TYPE1
+			,DU.DATATYPE_ID		AS DATATYPE_ID
+			,DU.STD_ID			AS STD_ID
+			,SP.SCHEDULE_PAUSE_DAYS	AS PAUSE_DAYS
+			,SP.ENABLED			AS ENABLED
+			,SP.VIEW_USER		AS VIEW_USER
+			,SP.CYCLE			AS CYCLE
+			,IFNULL(SP.ACTION, 0)		AS ACTION
+			,DATE_FORMAT(SP.START_DTM, '%Y-%m-%d %H:%i')		AS START_DTM
+			,SCHEDULE_PAUSE_FROM  AS PAUSE_FROM
+			,SCHEDULE_PAUSE_FROM_MINU  AS PAUSE_FROM_MINU
+			,SCHEDULE_PAUSE_TO  AS PAUSE_TO
+			,SCHEDULE_PAUSE_TO_MINU  AS PAUSE_TO_MINU
+			,DU.DATATYPE AS DATATYPE
+			,policy_type 		AS POLICY_TYPE
+			,DU.recent AS RECENT
+     	FROM PI_SCAN_POLICY SP
+     		LEFT OUTER JOIN PI_DATATYPES_USER DU ON SP.STD_ID = DU.STD_ID
+     		<if test="schedule_use != 1 and schedule_use != 2">
+     		 AND DU.ENABLE = 1
+     		</if>
+     	WHERE 1=1
+     	<if test="schedule_use == 2">
+     		 AND DU.ENABLE = 1
+     		 <if test="grade == 4 or grade == 5 or grade == 6">
+     		 	AND POLICY_TYPE = 1
+     		 	AND SP.ENABLED = 1
+     		 </if>
+     		 <if test="grade != 9 and grade != 4 and grade != 5 and grade != 6">
+     		 	AND SP.VIEW_USER REGEXP #{user_no}
+     		 </if>
+     	</if>
+		<if test="name != null">
+		  	AND POLICY_NAME like concat('%', #{name}, '%')
+		</if>
+		<if test="policyid != null">
+		  	AND IDX = #{policyid}
+		</if>
+		AND SP.ENABLE = 1
+		GROUP BY IDX
+		ORDER BY SP.IDX DESC
+	</select>
+	
+	<delete id="deletePolicy" parameterType="hashmap">
+		<!-- DELETE FROM PI_SCAN_POLICY
+		WHERE 1=1
+			AND IDX = #{idx} -->
+			
+		UPDATE PI_SCAN_POLICY SET ENABLE = 0
+		WHERE 1 = 1
+		  AND IDX = #{idx}
+	</delete>
+	
+	<update id="modifyPolicy" parameterType="hashmap">
+		UPDATE PI_SCAN_POLICY SET
+		    POLICY_NAME = #{policy_name}
+		   ,COMMENT = #{comment}
+		   ,CYCLE = #{cycle}
+		   ,ACTION = #{action}
+		   ,DATATYPE_ID = #{datatype_id}
+		   ,STD_ID = #{std_id}
+		   ,ENABLED = #{enabled}
+		   ,VIEW_USER = #{user_no}
+		   ,START_DTM = STR_TO_DATE(#{start_dtm},'%Y-%m-%d %H:%i')
+		   , SCHEDULE_PAUSE_DAYS = #{pause_days}
+		   , SCHEDULE_PAUSE_FROM = #{from_time_hour}
+		   , SCHEDULE_PAUSE_FROM_MINU =#{from_time_minutes}
+		   , SCHEDULE_PAUSE_TO = #{to_time_hour}
+		   , SCHEDULE_PAUSE_TO_MINU = #{to_time_minutes}
+		   , POLICY_TYPE = #{policy_type}
+     	WHERE IDX = #{idx}
+	</update>
+	
+	<insert id="insertPolicy" parameterType="hashmap">
+		INSERT INTO PI_SCAN_POLICY
+			(POLICY_NAME, COMMENT, CYCLE, ACTION, DATATYPE_ID, STD_ID, ENABLED, START_DTM, SCHEDULE_PAUSE_DAYS, SCHEDULE_PAUSE_FROM, SCHEDULE_PAUSE_FROM_MINU, SCHEDULE_PAUSE_TO, SCHEDULE_PAUSE_TO_MINU, VIEW_USER, POLICY_TYPE)
+		VALUES
+			(#{policy_name}, #{comment}, #{cycle}, #{action}, #{datatype_id}, #{std_id}, #{enabled}, STR_TO_DATE(#{start_dtm},'%Y-%m-%d %H:%i'), #{pause_days}, #{from_time_hour}, #{from_time_minutes}, #{to_time_hour}, #{to_time_minutes}, #{user_no}, #{policy_type})
+	</insert>
+	
+	<select id="getStatusList" parameterType="hashmap" resultType="hashmap">
+		SELECT DATA.TARGET_ID,
+			DATA.AP_NO,
+			DATA.FULL_NAME,
+			DATA.HOST_NAME,
+			DATA.NAME,
+			DATA.SERIAL,
+			DATA.PLATFORM,
+			DATA.TARGET_USE,
+			DATA.PATH_CNT,
+			DATA.TOTAL,
+			DATA.REGDATE,
+			DATA.SCHEDULE_ID,
+			DATA.LOCATION_ID,
+			DATA.DATATYPE_ID,
+			DATA.SCHEDULE_STATUS,
+			DATA.SCHEDULE_PAUSE_DAYS,
+			DATA.SCHEDULE_PAUSE_FROM,
+			DATA.SCHEDULE_PAUSE_TO,
+			DATA.SCHEDULE_REPEAT_DAYS,
+			DATA.SCHEDULE_REPEAT_MONTHS,
+			DATA.SCAN_TIME,
+			DATA.GROUP_NAME,
+			DATA.SERVICE_NM,
+			DATA.SERVICE_MNGR_NO,
+			DATA.SERVICE_MNGR,
+			DATA.SERVICE_MNGR2_NO,
+			DATA.SERVICE_MNGR2,
+			DATA.SERVICE_MNGR3_NO,
+			DATA.SERVICE_MNGR3,
+			DATA.SERVICE_MNGR4,
+			DATA.SERVICE_MNGR5,
+			DATA.CONFIRM,
+			DATA.POLICY_ID,
+			DATA.ENABLE,
+			DATA.POLICY_NM,
+			DATA.MEMO
+		FROM (
+			SELECT T.TARGET_ID,
+				T.AP_NO,
+				T.NAME AS FULL_NAME,
+				SUBSTRING_INDEX(T.NAME, '.', 1) AS HOST_NAME,
+				SUBSTRING_INDEX(SUBSTRING_INDEX(T.NAME, '.', -2), '.', 1) AS NAME,
+				SUBSTRING_INDEX(T.NAME, '.', -1) AS SERIAL,
+				T.PLATFORM,
+				T.TARGET_USE,
+				MAX_TP.PATH_CNT,
+				MAX_TP.TOTAL,
+				MAX_TP.REGDATE,
+				SD.SCHEDULE_ID,
+				SDL.LOCATION_ID,
+				SD.SCHEDULE_DATATYPE_PROFILES AS DATATYPE_ID,
+				SD.SCHEDULE_STATUS,
+				SD.SCHEDULE_PAUSE_DAYS,
+				SD.SCHEDULE_PAUSE_FROM,
+				SD.SCHEDULE_PAUSE_TO,
+				SD.SCHEDULE_REPEAT_DAYS,
+				SD.SCHEDULE_REPEAT_MONTHS,
+				FROM_UNIXTIME(SD.SCHEDULE_NEXT_SCAN,'%Y-%m-%d %H:%i') AS SCAN_TIME,
+				# IFNULL(CASE WHEN T.AP_NO = 0 THEN (SELECT G.NAME FROM pi_target_group G WHERE G.IDX = T.GROUP_IDX) ELSE 'PC' END, '') AS GROUP_NAME,
+				TG.NAME AS GROUP_NAME,
+				IFNULL(CASE WHEN (TU.SERVICE_NM IS NULL OR TU.SERVICE_NM = '') THEN AI.SVR_HOST ELSE TU.SERVICE_NM END,'-') AS SERVICE_NM,
+				TU.SERVICE_MNGR2 AS SERVICE_MNGR_NO,
+				(SELECT UA.USER_NAME FROM pi_user UA WHERE TU.USER_NO = UA.USER_NO) AS SERVICE_MNGR,
+				TU.SERVICE_MNGR2 AS SERVICE_MNGR2_NO,
+				(SELECT UA.USER_NAME FROM PI_USER UA WHERE TU.SERVICE_MNGR2 = UA.USER_NO) AS SERVICE_MNGR2,
+				TU.SERVICE_MNGR3 AS SERVICE_MNGR3_NO,
+				(SELECT UA.USER_NAME FROM PI_USER UA WHERE TU.SERVICE_MNGR3 = UA.USER_NO )AS SERVICE_MNGR3,
+				(SELECT UA.USER_NAME FROM PI_USER UA WHERE TU.SERVICE_MNGR4 = UA.USER_NO )AS SERVICE_MNGR4,
+				(SELECT UA.USER_NAME FROM PI_USER UA WHERE TU.SERVICE_MNGR5 = UA.USER_NO )AS SERVICE_MNGR5,
+				MAX_STS.CONFIRM,
+				MAX_STS.POLICY_ID,
+				IFNULL(SP.ENABLE, 2) AS ENABLE,
+				IFNULL(SP.POLICY_NAME,'') AS POLICY_NM,
+				'' AS MEMO
+			FROM pi_ap_server AP, pi_targets T
+			  LEFT OUTER JOIN PI_AGENTS A ON T.NAME = A.AGENT_NAME AND T.AP_NO = A.AP_NO
+			  LEFT OUTER JOIN PI_ACCOUNT_INFO AI ON T.NAME = AI.HOST_NM AND T.AP_NO = 0 AND A.AGENT_CONNECTED_IP = AI.ip
+			  LEFT OUTER JOIN PI_TARGET_GROUP TG ON AI.group_id = TG.IDX 	
+			  LEFT OUTER JOIN pi_target_service_user SU ON T.TARGET_ID = SU.TARGET_ID AND T.AP_NO = SU.AP_NO
+			  LEFT OUTER JOIN pi_target_user TU ON T.TARGET_ID = TU.TARGET_ID AND T.AP_NO = TU.AP_NO
+			  LEFT OUTER JOIN (SELECT TP.TARGET_ID, TP.AP_NO, TP.PATH_CNT, TP.TOTAL, TP.REGDATE FROM pi_topcomp TP, 
+				(SELECT TCP.TARGET_ID, TCP.AP_NO ,MAX(TCP.REGDATE) AS REGDATE FROM pi_topcomp TCP GROUP BY TCP.TARGET_ID, TCP.AP_NO) TCP
+				WHERE TCP.TARGET_ID = TP.TARGET_ID
+				  AND TCP.AP_NO = TP.AP_NO
+				  AND TP.REGDATE = TCP.REGDATE
+				) AS MAX_TP ON T.TARGET_ID = MAX_TP.TARGET_ID AND T.AP_NO = MAX_TP.AP_NO 
+			LEFT OUTER JOIN (SELECT ST.TARGET_ID, ST.AP_NO, ST.LOCATION_ID, ST.RECON_SCHEDULE_ID,ST.REGDATE, ST.POLICY_ID, ST.CONFIRM FROM pi_schedule_targets ST,
+				(SELECT STS.TARGET_ID, STS.AP_NO ,MAX(STS.REGDATE) AS REGDATE FROM pi_schedule_targets STS GROUP BY STS.TARGET_ID, STS.AP_NO) STS
+				WHERE STS.TARGET_ID = ST.TARGET_ID
+				  AND STS.AP_NO = ST.AP_NO
+				  AND STS.REGDATE = ST.REGDATE
+				) AS MAX_STS ON T.TARGET_ID = MAX_STS.TARGET_ID AND T.AP_NO = MAX_STS.AP_NO  
+			LEFT OUTER JOIN pi_scan_policy SP ON MAX_STS.POLICY_ID = SP.IDX
+			LEFT OUTER JOIN pi_schedules SD ON MAX_STS.AP_NO = SD.AP_NO AND MAX_STS.RECON_SCHEDULE_ID = SD.SCHEDULE_ID
+			LEFT OUTER JOIN pi_scheduled_location SDL ON MAX_STS.AP_NO = SDL.AP_NO AND SDL.SCH_ID = SD.SCHEDULE_ID AND SD.SCHEDULE_TARGET_ID = SDL.TARGET_ID
+		WHERE 1 = 1
+		<choose>
+			<when test="user_grade == 0 or user_grade == 1 or user_grade == 2 or user_grade == 3 or user_grade == 7">
+				AND (SU.USER_NO = '${user_no}' OR TU.USER_NO = '${user_no}')
+				AND T.AP_NO = AP.AP_NO
+				AND AP.IS_SERVER != 1
+			</when>
+			<when test="user_grade == 9"></when>
+			<otherwise>
+		  		AND (SU.USER_NO = '${user_no}' OR TU.USER_NO = '${user_no}' OR TU.SERVICE_USER = '${user_no}' OR TU.INFRA_MANAGER = '${user_no}')
+			</otherwise>
+		</choose>
+		<if test='sch_host != null and sch_host != ""'>
+	  	  AND T.NAME LIKE concat('%', #{sch_host}, '%')
+		</if>
+		<if test='sch_svcName != null and sch_svcName != ""'>
+		  AND TU.SERVICE_NM LIKE CONCAT('%', #{sch_svcName}, '%')
+		</if>
+		AND T.TARGET_USE = 'Y'
+		GROUP BY T.TARGET_ID, T.AP_NO
+		) DATA
+		WHERE 1= 1
+			<if test='sch_svcManager != null and sch_svcManager != ""'>
+			  	AND (DATA.USER_NAME LIKE CONCAT('%','${sch_svcManager}','%') OR DATA.SERVICE_USER_NM LIKE CONCAT('%','${sch_svcManager}','%') OR DATA.ADMIN_NM LIKE CONCAT('%','${sch_svcManager}','%'))
+			</if>
+		  <if test='sch_group != null and sch_group != ""'>
+			  	AND DATA.GROUP_NAME LIKE CONCAT('%', #{sch_group}, '%')
+			</if>
+		<!-- ORDER BY DATA.NAME -->
+		ORDER BY 
+		<!-- 완료, 대기, 비활성, 취소, 실패 -->
+		FIELD(DATA.SCHEDULE_STATUS, 'failed', 'stalled', 'deactivated', 'queued', 'interrupted', 'completed', 'cancelled', 'stop', 'paused', 'scanning', 'scheduled') DESC,
+		DATA.NAME DESC,
+    	DATA.SCHEDULE_STATUS DESC
+	</select>
+	
+	<select id="getUserList" parameterType="hashmap" resultType="hashmap">
+		SELECT DISTINCT 
+			U.USER_GRADE AS CHKBOX, '' as USER_PHONE_STATUS, U.USER_EMAIL,
+			U.USER_NO, U.JIKWEE, U.JIKGUK, U.BOSS_NAME, U.USER_NAME, U.INSA_CODE,
+			(SELECT G.TEAM_NAME FROM PI_GROUP G WHERE G.INSA_CODE = U.INSA_CODE) AS TEAM_NAME, 
+			DATE_FORMAT(U.REGDATE, '%Y-%m-%d %h:%i:%s' ) AS REGDATE,
+			DATE_FORMAT(U.STARTDATE, '%Y-%m-%d' ) AS STARTDATE,
+			DATE_FORMAT(U.ENDDATE, '%Y-%m-%d' ) AS ENDDATE,
+			U.USER_GRADE, U.USER_GRADE AS OLD_USER_GRADE,
+			IFNULL(U.USER_PHONE, '') AS USER_PHONE,
+			if(NOW() > LOCK_DATE, 'N', 'Y') AS LOCK_ACCOUNT,
+			U.ACCESS_IP,
+			U.LOCK_STATUS,
+			DATE_FORMAT(U.LOGINDATE, '%Y-%m-%d' ) AS LOGINDATE,
+			DATE_FORMAT(DATE_SUB(U.LOGINDATE, INTERVAL 3 MONTH), '%Y-%m-%d') AS LOGINDATE2,
+			U.UNLOCK_REASON,
+			'' AS MEMBER_STATUS,
+			U.ACC_YN,
+			(CASE WHEN U.ACC_YN = 'Y' THEN '재직자' ELSE '퇴직자' END) AS ACC_YN_NM,
+			LOCK_EMAIL
+			<!-- U.USER_GRADE AS CHKBOX,
+			U.USER_NO, U.JIKWEE, U.JIKGUK, U.BOSS_NAME, U.USER_NAME, U.INSA_CODE,
+			(SELECT G.TEAM_NAME FROM PI_GROUP G WHERE G.INSA_CODE = U.INSA_CODE) AS TEAM_NAME, 
+			DATE_FORMAT(U.REGDATE, '%Y-%m-%d %h:%i:%s' ) AS REGDATE,
+			DATE_FORMAT(U.STARTDATE, '%Y-%m-%d' ) AS STARTDATE,
+			DATE_FORMAT(U.ENDDATE, '%Y-%m-%d' ) AS ENDDATE,
+			U.USER_GRADE, U.USER_GRADE AS OLD_USER_GRADE,
+			if(NOW() > LOCK_DATE, 'N', 'Y') AS LOCK_ACCOUNT -->
+		FROM PI_USER U 
+		WHERE 1 = 1
+		#AND U.USER_GRADE != '9'
+			<if test='sch_aut != null and sch_aut != ""'>
+	           AND U.USER_GRADE = #{sch_aut}
+	        </if>
+			<if test='sch_id != null and sch_id != ""'>
+			  	AND U.USER_NO LIKE concat('%', #{sch_id}, '%')
+			</if>
+			<if test='sch_userName != null and sch_userName != ""'>
+			  	AND U.USER_NAME LIKE concat('%', #{sch_userName}, '%')
+			</if>
+			<if test='sch_teamName != null and sch_teamName != ""'>
+			  	AND (SELECT G.TEAM_NAME FROM PI_GROUP G WHERE G.INSA_CODE = U.INSA_CODE) LIKE concat('%', #{sch_teamName}, '%')
+			</if>
+			<if test="sch_userLeave != null and sch_userLeave != ''">
+				<choose>
+					<when test='sch_userLeave == 0'>
+						AND U.ACC_YN = 'Y'
+					</when>
+					<otherwise>
+						AND U.ACC_YN = 'N'
+					</otherwise>
+				</choose>
+			</if>
+			<if test="sch_lockStatus != null and sch_lockStatus != ''">
+				AND DATE_FORMAT(U.LOGINDATE, '%Y-%m-%d') &lt; DATE_FORMAT(NOW(), '%Y-%m-%d') 
+				AND U.LOCK_STATUS = ${sch_lockStatus}
+			</if>
+	</select>
+	
+	<insert id="updateScanSchedule" parameterType="hashmap">
+		INSERT INTO pi_schedules
+		(
+			schedule_id,
+			schedule_status,
+			schedule_label,
+			schedule_repeat_days,
+			schedule_repeat_months,
+			schedule_datatype_profiles,
+			schedule_next_scan,
+			schedule_target_id,
+			schedule_target_name,
+			schedule_cpu,
+			schedule_capture,
+			schedule_trace,
+			ap_no,
+			<if test='pause_days != null and pause_days != ""'>
+			schedule_pause_days,
+		 	</if>
+		 	<if test='pause_from != null and pause_from != ""'>
+			schedule_pause_from,
+		 	</if>
+		 	<if test='pause_to != null and pause_to != ""'>
+			schedule_pause_to,
+		 	</if>
+		 	drm_status,
+			regdate
+		)
+		VALUES
+		(
+			#{id},
+			#{status},
+			#{label},
+			#{repeat_days},
+			#{repeat_months},
+			#{profiles},
+			#{next_scan},
+			#{target_id},
+			#{target_name},
+			#{cpu},
+			#{capture},
+			#{trace},
+			#{ap_no},
+			<if test='pause_days != null and pause_days != ""'>
+				#{pause_days},
+		 	</if>
+		 	<if test='pause_from != null and pause_from != ""'>
+				#{pause_from},
+		 	</if>
+		 	<if test='pause_to != null and pause_to != ""'>
+				#{pause_to},
+		 	</if>
+		 	#{drm},
+			now()
+		)
+		ON DUPLICATE KEY UPDATE
+		schedule_label=#{label},
+		schedule_status=#{status},
+		schedule_repeat_days=#{repeat_days},
+		schedule_repeat_months=#{repeat_months},
+		schedule_datatype_profiles=#{profiles},
+		schedule_cpu=#{cpu},
+		schedule_capture=#{capture},
+		schedule_target_id=#{target_id},
+		schedule_target_name=#{target_name},
+		schedule_trace=#{trace},
+		schedule_next_scan=#{next_scan},
+		<if test='pause_days != null and pause_days != ""'>
+			schedule_pause_days=#{pause_days},
+	 	</if>
+	 	<if test='pause_from != null and pause_from != ""'>
+			schedule_pause_from=#{pause_from},
+	 	</if>
+	 	<if test='pause_to != null and pause_to != ""'>
+			schedule_pause_to=#{pause_to},
+	 	</if>
+	 	<if test='drm != null and drm != "" '>
+	 		drm_status=#{drm},
+	 	</if>
+		regdate=now()
+	</insert>
+	
+	<select id="selectScheduleGroup" parameterType="hashmap" resultType="hashmap">
+		SELECT D.* FROM
+		(SELECT 
+			G.SCHEDULE_GROUP_ID,
+			G.SCHEDULE_GROUP_NAME,
+			G.USER_NO,
+			(SELECT U.USER_NAME FROM PI_USER U WHERE U.USER_NO = G.USER_NO) AS USER_NAME,
+			G.STATUS,
+			G.TYPE,
+			G.POLICY_ID,
+			IF(G.POLICY_ID = -1, '-',  SP.POLICY_NAME) AS POLICY_NAME,
+			G.DATATYPE_ID,
+			DU.DATATYPE_LABEL,
+			DATE_FORMAT(G.REGDATE, '%Y-%m-%d %H:%i:%S') AS REGDATE,
+			DATE_FORMAT(SP.START_DTM, '%Y-%m-%d %H:%i')		AS START_DTM,
+			T.TARGET_ID
+		FROM pi_schedule_group G
+		 LEFT OUTER JOIN pi_datatypes_user DU ON G.STD_ID = DU.STD_ID
+		 LEFT OUTER JOIN pi_scan_policy SP ON G.POLICY_ID = SP.IDX
+		 LEFT OUTER JOIN pi_schedule_targets ST ON G.SCHEDULE_GROUP_ID = ST.SCHEDULE_GROUP_ID
+		 LEFT OUTER JOIN pi_targets T ON ST.TARGET_ID = T.TARGET_ID
+		WHERE 1 = 1
+		  <if test="user_grade != 9">
+		  	AND G.USER_NO = '${user_no}'
+		  </if>
+		  <if test='sch_type != "" and sch_type != null'>
+		  	AND G.TYPE = ${sch_type}
+		  </if>
+		  <if test='title != "" and title != null'>
+		  	AND G.SCHEDULE_GROUP_NAME LIKE CONCAT('%', '${title}', '%')
+		  </if>
+		  AND T.TARGET_ID IS NOT NULL
+		GROUP BY G.SCHEDULE_GROUP_ID) D
+		WHERE 1 = 1
+		  <if test='writer != "" and writer != null'>
+		  	AND D.USER_NAME LIKE CONCAT('%', '${writer}', '%')
+		  </if>
+		  <if test='fromDate != "" and fromDate != null'>
+			AND D.REGDATE BETWEEN CONCAT(#{fromDate},' 00:00:00') AND CONCAT(#{toDate},' 23:59:59')
+		</if>	
+		ORDER BY D.REGDATE DESC, D.SCHEDULE_GROUP_NAME
+	</select>
+	
+	
+	<select id="selectScheduleTargets" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+			ST.TARGET_ID,
+			ST.AP_NO,
+			T.NAME AS FULL_NAME,
+			SUBSTRING_INDEX(T.NAME, '.', 1) AS HOST_NAME,
+			SUBSTRING_INDEX(SUBSTRING_INDEX(T.NAME, '.', -2), '.', 1) AS NAME,
+			SUBSTRING_INDEX(T.NAME, '.', -1) AS SERIAL,
+			T.PLATFORM,
+			ST.RECON_SCHEDULE_ID,
+			ST.POLICY_ID,
+			ST.DATATYPE_ID,
+			DU.DATATYPE_LABEL,
+			DU.ENABLE,
+			S.SCHEDULE_STATUS,
+			DATE_FORMAT(ST.REGDATE, '%Y-%m-%d %H:%i:%S') AS REGDATE
+		FROM pi_schedule_targets ST
+		  LEFT OUTER JOIN pi_datatypes_user DU ON ST.DATATYPE_ID = DU.DATATYPE_ID
+		  LEFT OUTER JOIN pi_locations L ON L.TARGET_ID = ST.TARGET_ID AND ST.LOCATION_ID = L.LOCATION_ID
+		, pi_targets T, pi_schedules S
+		WHERE 1 = 1
+		  AND ST.RECON_SCHEDULE_ID = S.SCHEDULE_ID
+		  AND ST.AP_NO = S.AP_NO
+		  AND ST.TARGET_ID = T.TARGET_ID
+		  AND ST.AP_NO = T.AP_NO
+		  AND ST.SCHEDULE_GROUP_ID = #{group_id}
+		  <if test="taskList != null">
+		  	AND S.SCHEDULE_STATUS IN (
+			<foreach collection="taskList" item="item" separator=",">
+		        #{item}
+		    </foreach>
+		    )
+		  </if>
+		GROUP BY T.TARGET_ID, T.AP_NO, ST.RECON_SCHEDULE_ID
+		ORDER BY T.NAME
+	
+		<!-- SELECT 
+			ST.TARGET_ID,
+			ST.AP_NO,
+			T.NAME,
+			ST.RECON_SCHEDULE_ID,
+			ST.POLICY_ID,
+			DU.DATATYPE_LABEL,
+			DATE_FORMAT(ST.REGDATE, '%Y-%m-%d %H:%i:%S') AS REGDATE
+		FROM pi_schedule_targets ST, pi_datatypes_user DU, PI_TARGETS T
+		WHERE 1 = 1
+		  AND ST.POLICY_ID = DU.STD_ID
+		  AND ST.TARGET_ID = T.TARGET_ID
+		  AND ST.AP_NO = T.AP_NO
+		  AND ST.SCHEDULE_GROUP_ID = #{group_id}
+		GROUP BY T.TARGET_ID, T.AP_NO 
+		ORDER BY T.NAME -->
+	</select>
+	
+	<insert id="insertScheduleGroup" parameterType="hashmap">
+		INSERT INTO pi_schedule_group
+		(
+			SCHEDULE_GROUP_NAME,
+			USER_NO,
+			STATUS,
+			TYPE,
+			POLICY_ID,
+			DATATYPE_ID,
+			STD_ID,
+			REGDATE
+		)
+		VALUES
+		(
+			#{scheduleName},
+			#{user_no},
+			'1',
+			#{type},
+			#{policy_id},
+			#{datatype_id},
+			#{std_id},
+			NOW()
+		)
+		<selectKey resultType="int" keyProperty="SCHEDULE_GROUP_ID" order="AFTER">
+			SELECT LAST_INSERT_ID() AS SCHEDULE_GROUP_ID
+		</selectKey>
+	</insert>
+	
+	<insert id="insertScheduleGroupOneDrive" parameterType="hashmap">
+		INSERT INTO pi_schedule_group
+		(
+			SCHEDULE_GROUP_NAME,
+			USER_NO,
+			STATUS,
+			TYPE,
+			POLICY_ID,
+			DATATYPE_ID,
+			STD_ID,
+			REGDATE
+		)
+		VALUES
+		(
+			#{scheduleName},
+			#{user_no},
+			'1',
+			'2',
+			#{policy_id},
+			#{datatype_id},
+			#{std_id},
+			NOW()
+		)
+		<selectKey resultType="int" keyProperty="SCHEDULE_GROUP_ID" order="AFTER">
+			SELECT LAST_INSERT_ID() AS SCHEDULE_GROUP_ID
+		</selectKey>
+	</insert>
+	
+	<delete id="failedSchedule" parameterType="hashmap">
+	 	DELETE FROM PI_SCHEDULE_GROUP WHERE SCHEDULE_GROUP_ID = ${groupID};
+	</delete>
+	
+	<insert id="insertScheduleTargets" parameterType="hashmap">
+		INSERT INTO pi_schedule_targets
+		(
+			TARGET_ID,
+			LOCATION_ID,
+			AP_NO,
+			SCHEDULE_GROUP_ID,
+			RECON_SCHEDULE_ID,
+			STATUS,
+			POLICY_ID,
+			DATATYPE_ID,
+			CONFIRM,
+			ACTION,
+			REGDATE
+		)
+		VALUES
+		(
+			#{target_id},
+			#{location_id},
+			#{ap_no},
+			#{groupID},
+			#{reconScheduleID},
+			"1",
+			#{policy_id},
+			#{datatype_id},
+			0,
+			#{action},
+			NOW()
+		)
+		<!-- 
+		ON DUPLICATE KEY UPDATE
+		SCHEDULE_GROUP_ID=#{groupID},
+		RECON_SCHEDULE_ID=#{reconScheduleID},
+		POLICY_ID=#{policy_id},
+		DATATYPE_ID=#{datatype_id},
+		REGDATE=NOW() -->
+	</insert>
+	
+	<select id="selectScanDataTypes" parameterType="hashmap" resultType="hashmap">
+		SELECT DU.AP_NO, DU.DATATYPE_ID 
+		FROM pi_datatypes_user DU
+		WHERE DU.STD_ID = #{std_id}
+	</select>
+	
+	<select id="selectSKTScanDataTypes" parameterType="hashmap" resultType="hashmap">
+		SELECT T.TARGET_ID,
+			'8987302884414283716' AS LOCATION_ID,
+			T.AP_NO,
+			T.NAME,
+			DU.DATATYPE_ID,
+			SP.STD_ID,
+			NS.POLICY_ID,
+			SP.ACTION,
+			NS.TRACE,
+			IFNULL(NS.DRM_STATUS, 'NONE') AS DRM_STATUS
+		FROM pi_targets T, skt_net_schedule NS, pi_scan_policy SP, pi_datatypes_user DU, pi_locations L
+		WHERE NS.POLICY_ID = SP.IDX 
+		<choose>
+			<when test="net_type ==3">
+				  AND L.NET_ID = NS.NET_ID
+				  AND NS.LOCATION_ID = L.LOCATION_ID
+			</when>
+			<otherwise>
+				  AND T.NET_ID = NS.NET_ID
+			</otherwise>
+		</choose>
+		  AND SP.STD_ID = DU.STD_ID
+		  AND T.AP_NO = DU.AP_NO
+		  AND T.TARGET_ID = L.TARGET_ID
+		  AND NS.ENABLE = 'Y'
+	      AND T.TARGET_ID = #{target_id}
+	      AND L.LOCATION_ID = #{location_id}
+		  AND T.AP_NO = #{ap_no}
+	</select>
+	
+	<update id="updateConfirmApply" parameterType="hashmap">
+		UPDATE PI_SCHEDULE_TARGETS 
+		SET CONFIRM = ${confirm} 
+		WHERE AP_NO = ${ap_no} 
+		  AND RECON_SCHEDULE_ID = ${schedule_id}
+	</update>
+	
+	<select id="selectNetHost" parameterType="hashmap" resultType="hashmap">
+		SELECT T.TARGET_ID,
+			T.AP_NO,
+			T.NAME,
+			A.AGENT_CONNECTED_IP,
+			L.LOCATION_ID
+		FROM pi_targets T
+			LEFT OUTER JOIN pi_agents A ON T.NAME = A.AGENT_NAME
+			LEFT OUTER JOIN PI_LOCATIONS L ON T.TARGET_ID = L.TARGET_ID AND (L.DESCRIPTION REGEXP 'Catalog|All local files')
+		WHERE T.AP_NO != 0
+		  AND A.AGENT_CONNECTED_IP REGEXP #{net_ip}
+	</select>
+	
+	<select id="selectSchedulePCStatus" parameterType="hashmap" resultType="hashmap">
+		SELECT S.SCHEDULE_ID,
+			S.SCHEDULE_STATUS
+		FROM pi_schedule_targets ST
+		 LEFT OUTER JOIN pi_schedules S ON ST.TARGET_ID = S.SCHEDULE_TARGET_ID AND ST.RECON_SCHEDULE_ID = S.SCHEDULE_ID AND ST.AP_NO = S.AP_NO
+		WHERE 1 = 1
+		  AND S.AP_NO = ${ap_no}
+		  AND ST.TARGET_ID = #{target_id}
+		  AND ST.LOCATION_ID = #{location_id}
+		  AND S.SCHEDULE_STATUS IN ('scheduled', 'scanning', 'paused')
+	</select>
+	
+	<update id="updateScheduleGroupStatus" parameterType="hashmap">
+		UPDATE pi_schedule_group
+		SET STATUS = #{status}
+		WHERE SCHEDULE_GROUP_ID = #{group_id}
+	</update>
+	
+	 <select id="selectScheduleId" parameterType="hashmap" resultType="int">
+	 	SELECT MAX(NET_ID)+1 AS NET_ID FROM skt_net_schedule 
+	 </select>
+	
+	<insert id="insertNetPolicy" parameterType="hashmap">
+		INSERT INTO SKT_NET_SCHEDULE (NET_ID, NET_TYPE, AP_NO, NET_TYPE_ID, NET_TYPE_NM, POLICY_ID, REGDATE, TRACE, DRM_STATUS, SCANDAY) 
+		VALUES (#{net_id}, #{type}, #{ap_no}, #{rangeId}, #{rangeNm}, #{policyId}, NOW(), #{trace}, #{drm}, #{scanday})
+	</insert>
+	
+	<insert id="insertOneDrivePolicy" parameterType="hashmap">
+		INSERT INTO SKT_NET_SCHEDULE (NET_ID, NET_TYPE, AP_NO, NET_TYPE_ID, LOCATION_ID, NET_TYPE_NM, POLICY_ID, REGDATE, TRACE, DRM_STATUS, SCANDAY) 
+		VALUES 
+		(#{net_id}, #{type}, #{ap_no}, #{targetId}, #{rangeId}, #{rangeOneDriveNm}, #{policyId}, NOW(), #{trace}, #{drm}, NULL)
+	</insert>
+	
+	<delete id="deleteNetPolicy" parameterType="hashmap">
+		DELETE FROM SKT_NET_SCHEDULE
+		WHERE NET_ID = #{net_id}
+	</delete>
+	
+	<update id="updateNetPolicy" parameterType="hashmap">
+		UPDATE SKT_NET_SCHEDULE SET 
+			NET_TYPE = #{type}, 
+			AP_NO = #{ap_no},
+			location_id = null, 
+			NET_TYPE_ID = #{rangeId}, 
+			NET_TYPE_NM = #{rangeNm}, 
+			POLICY_ID = #{policyId}, 
+			REGDATE = NOW(), 
+			TRACE = #{trace}, 
+			SCANDAY = #{scanday}, 
+			DRM_STATUS = #{drm}
+		WHERE NET_ID = #{net_id}
+	</update>
+	
+	<update id="updateOneDrivePolicy" parameterType="hashmap">
+		UPDATE SKT_NET_SCHEDULE SET 
+			NET_TYPE = #{type}, 
+			AP_NO = #{rangeId},
+			location_id = #{rangeId}, 
+			NET_TYPE_ID = #{rangeId}, 
+			NET_TYPE_NM = #{rangeOneDriveNm}, 
+			POLICY_ID = #{policyId}, 
+			REGDATE = NOW(), 
+			TRACE = #{trace}, 
+			DAY = #{day}, 
+			DRM_STATUS = NULL
+		WHERE NET_ID = #{net_id}
+	</update>
+	
+	<insert id="insertNetSchedule" parameterType="hashmap">
+		INSERT INTO SKT_NET_SCHEDULE_TIME (NET_ID, SCHEDULE_TIME, NET_TYPE_NM)
+		VALUES
+		<foreach collection="timeArr" item="item" separator=",">
+		 (#{net_id}, #{item}, #{rangeNm})
+		</foreach>
+	</insert>
+	
+	<insert id="updateNetSchedule" parameterType="hashmap">
+		INSERT INTO SKT_NET_SCHEDULE_TIME (NET_ID, SCHEDULE_TIME, NET_TYPE_NM)
+		VALUES
+		<foreach collection="timeArr" item="item" separator=",">
+		 (#{net_id}, #{item}, #{rangeNm})
+		</foreach>
+	</insert>
+	
+	<delete id="deleteNetSchedule" parameterType="hashmap">
+		DELETE FROM SKT_NET_SCHEDULE_TIME
+		WHERE NET_ID = #{net_id}
+	</delete>
+	
+	<update id="updateNetTarget" parameterType="hashmap">
+		UPDATE PI_TARGETS T
+		   SET NET_ID = #{net_id}
+		WHERE 1 = 1
+		<if test="type == 0"><!-- 네트워크 일 경우 -->
+		 	AND NET_TYPE = #{rangeId}
+		</if>
+		 <if test="type == 2"><!-- pc 일 경우 -->
+		 	AND TARGET_ID = #{rangeId}
+		</if>
+	</update>
+	
+	<update id="updateNetDeptTarget" parameterType="hashmap">
+		UPDATE pi_targets T, 
+			(SELECT * FROM 
+			(WITH RECURSIVE CTE AS 
+			(SELECT
+					0 AS LEVEL, 
+					G.INSA_CODE,
+					G.TEAM_NAME,
+					G.TEAM_NAME AS FULL_TEAM_NM,
+					G.UP_IDX
+				FROM pi_group G
+				WHERE 1 = 1
+				  AND G.INSA_CODE = #{rangeId}
+				UNION ALL
+				SELECT 
+					CTE.LEVEL + 1 AS LEVEL,
+					PG.INSA_CODE,
+					PG.TEAM_NAME,
+					CONCAT(CTE.FULL_TEAM_NM, '>', PG.TEAM_NAME) AS FULL_TEAM_NM,
+					PG.UP_IDX
+				FROM pi_group PG, CTE
+				WHERE PG.UP_IDX = CTE.INSA_CODE
+			)
+			SELECT TU.TARGET_ID,
+				TU.AP_NO
+			FROM CTE, pi_user U, pi_target_user TU
+			WHERE CTE.INSA_CODE = U.INSA_CODE
+			  AND TU.USER_NO = U.USER_NO
+			  AND TU.AP_NO != 0) AS D) D
+		SET T.NET_ID = #{net_id}
+		WHERE 1 = 1
+		  AND T.TARGET_ID = D.TARGET_ID
+		  AND T.AP_NO = D.AP_NO
+		  AND T.TARGET_USE = 'Y'
+	</update>
+	
+	<update id="updateNetPCTarget" parameterType="hashmap">
+		UPDATE PI_TARGETS 
+		   SET NET_ID = #{NET_ID}
+		WHERE 1 = 1
+		  AND TARGET_ID = #{rangeId}
+	</update>
+	
+	<update id="updateNetOneDrive" parameterType="hashmap">
+		UPDATE PI_LOCATIONS  SET 
+			NET_ID = #{net_id}
+		WHERE 1 = 1
+			AND TARGET_ID = #{targetId}
+			AND LOCATION_ID IN 
+			<foreach collection="rangeIdArr" item="item" open="(" separator="," close=")">
+			 #{item}
+			</foreach>
+	</update>
+	
+	<update id="updateNetStatus" parameterType="hashmap">
+		UPDATE SKT_NET_SCHEDULE SET   
+			ENABLE = 'N'               
+		WHERE NET_ID = #{before_net_id}             
+			AND LOCATION_ID IS NOT NULL
+			
+	</update>
+	
+	<update id="updateNetOneDriveTarget" parameterType="hashmap">
+		UPDATE PI_LOCATIONS 
+		   SET NET_ID = #{NET_ID}
+		WHERE 1 = 1
+		  AND TARGET_ID = #{targetId}
+		  AND LOCATION_ID = #{rangeId}
+	</update>
+	
+	<select id="selectPCPolicy" parameterType="hashmap" resultType="hashmap">
+		<!-- SELECT NS.NET_ID,
+			NS.NET_TYPE AS TYPE,
+			NS.AP_NO,
+			SP.DATATYPE_ID,
+			(CASE WHEN NS.NET_TYPE = 0 THEN '네트워크' WHEN NS.NET_TYPE = 1 THEN '그룹' WHEN NS.NET_TYPE = 2 THEN 'PC' ELSE 'OneDrive' END) AS TYPE_NM,
+			NS.NET_TYPE_ID,
+			L.LOCATION_ID,
+			CASE WHEN SUBSTRING(T.PLATFORM, 1, 5) = 'Apple' THEN SUBSTRING_INDEX(T.NAME, '.', -1) 
+				  WHEN NS.NET_TYPE = 3 THEN CONCAT(NET_TYPE_NM, ' 외 ' ,COUNT(NS.NET_ID)-1,'건') 
+			ELSE NS.NET_TYPE_NM  END AS NET_TYPE_NM,
+			IF(SUBSTRING(T.PLATFORM, 1, 5) = 'Apple', SUBSTRING_INDEX(T.NAME, '.', 1), null) AS MAC_SERIAL,
+			T.PLATFORM,
+			A.AGENT_CONNECTED,
+			NS.POLICY_ID,
+			SP.POLICY_NAME,
+			NS.TRACE,
+			NS.DRM_STATUS,
+			NS.DAY,
+			(CASE WHEN NS.NET_TYPE != 3 THEN (SELECT COUNT(T.NAME) FROM pi_targets T WHERE NS.NET_ID =T.NET_ID AND T.AP_NO != 0)
+				  ELSE (SELECT COUNT(L.PATH) FROM pi_locations L WHERE NS.NET_ID =L.NET_ID ) END) AS PC_COUNT,
+			DATE_FORMAT(NS.REGDATE, '%Y-%m-%d %H:%i') AS REGDATE
+		FROM skt_net_schedule NS
+			LEFT OUTER JOIN pi_targets T ON NS.NET_TYPE_ID = T.TARGET_ID
+			LEFT OUTER JOIN pi_locations L ON T.TARGET_ID = L.TARGET_ID AND NS.LOCATION_ID = L.LOCATION_ID
+			LEFT OUTER JOIN pi_agents A ON T.NAME = A.AGENT_NAME AND T.AP_NO = A.AP_NO
+			, pi_scan_policy SP
+		WHERE NS.POLICY_ID = SP.IDX
+		  AND NS.ENABLE = 'Y'
+		  <if test="net_nm != null">
+		  AND SP.POLICY_NAME LIKE CONCAT('%',#{net_nm},'%')
+		  </if>
+		GROUP BY NS.NET_ID
+		ORDER BY NS.REGDATE DESC -->
+		
+		SELECT (CASE WHEN (D.TYPE = 3 AND D.PC_COUNT > 1 ) THEN CONCAT(NET_TYPE_NAME ,'외 ', PC_COUNT-1, '건' )ELSE NET_TYPE_NAME END ) AS  NET_TYPE_NM ,
+				 D.*
+		FROM (SELECT NS.NET_ID,
+					NS.NET_TYPE AS TYPE,
+					NS.AP_NO,
+					SP.DATATYPE_ID,
+					(CASE WHEN NS.NET_TYPE = 0 THEN '네트워크' WHEN NS.NET_TYPE = 1 THEN '그룹' WHEN NS.NET_TYPE = 2 THEN 'PC' ELSE 'OneDrive' END) AS TYPE_NM,
+					NS.NET_TYPE_ID,
+					L.LOCATION_ID,
+					NS.NET_TYPE_NM AS NET_TYPE_NAME,
+					T.PLATFORM,
+					A.AGENT_CONNECTED,
+					NS.POLICY_ID,
+					SP.POLICY_NAME,
+					NS.TRACE,
+					NS.DRM_STATUS,
+					NS.SCANDAY,
+					(CASE WHEN NS.NET_TYPE != 3 THEN (SELECT COUNT(T.NAME) FROM pi_targets T WHERE NS.NET_ID =T.NET_ID AND T.AP_NO != 0)
+						  ELSE (SELECT COUNT(L.PATH) FROM pi_locations L WHERE NS.NET_ID =L.NET_ID ) END) AS PC_COUNT,
+					DATE_FORMAT(NS.REGDATE, '%Y-%m-%d %H:%i') AS REGDATE
+				FROM skt_net_schedule NS
+					LEFT OUTER JOIN pi_targets T ON NS.NET_TYPE_ID = T.TARGET_ID
+					LEFT OUTER JOIN pi_locations L ON T.TARGET_ID = L.TARGET_ID AND NS.LOCATION_ID = L.LOCATION_ID AND NS.NET_ID =  L.NET_ID
+					LEFT OUTER JOIN pi_agents A ON T.NAME = A.AGENT_NAME AND T.AP_NO = A.AP_NO
+					, pi_scan_policy SP
+				WHERE NS.POLICY_ID = SP.IDX
+				  AND NS.ENABLE = 'Y'
+				 <if test="net_nm != null">
+				 	AND SP.POLICY_NAME LIKE CONCAT('%',#{net_nm},'%')
+				  </if>
+				GROUP BY NS.NET_ID
+				ORDER BY NS.REGDATE DESC) D
+    </select>
+    
+    <select id="selectPCPolicyTime" parameterType="hashmap" resultType="hashmap">
+		SELECT NS.NET_ID,
+			 NS.NET_TYPE AS TYPE,
+			 ST.SCHEDULE_TIME,
+			 (CASE WHEN NS.NET_TYPE = 0 THEN '네트워크' WHEN NS.NET_TYPE = 1 THEN '그룹' ELSE 'PC' END) AS TYPE_NM
+		FROM skt_net_schedule NS, skt_net_schedule_time ST
+		WHERE 1=1
+		AND NS.NET_ID = ST.NET_ID
+		<if test="net_id">
+		  AND NS.NET_ID = #{net_id}
+	  	</if>
+    </select>
+    
+    <update id="deletePCPolicy" parameterType="hashmap">
+    	UPDATE skt_net_schedule 
+    	   SET ENABLE = 'N'
+    	WHERE NET_ID = #{NET_ID}
+	</update>
+	
+	 <select id="selectPCSearchStatus" parameterType="hashmap" resultType="hashmap">
+	 	SELECT H.AP_NO,
+			H.TARGET_ID,
+			H.LOCATION_ID,
+			H.NAME,
+			H.NET_ID,
+			H.SCHEDULE_ID,
+			(SELECT S.SCHEDULE_STATUS FROM pi_schedules S WHERE H.SCHEDULE_ID = S.SCHEDULE_ID AND H.AP_NO = S.AP_NO) AS SCHEDULE_STATUS,
+			H.SCAN_TIME
+		FROM
+		(SELECT T.AP_NO,
+			T.TARGET_ID,
+			L.LOCATION_ID,
+			T.NAME AS FULL_NAME,
+			SUBSTRING_INDEX(T.NAME, '.', 1) AS HOST_NAME,
+			(CASE WHEN L.PROTOCOL = 'onedrive' THEN L.PATH ELSE SUBSTRING_INDEX(SUBSTRING_INDEX(T.NAME, '.', -2), '.', 1) END) AS NAME,
+			SUBSTRING_INDEX(T.NAME, '.', -1) AS SERIAL,
+			T.NET_ID,
+			MAX(CAST(S.SCHEDULE_ID AS INT)) AS SCHEDULE_ID,
+			S.SCHEDULE_STATUS,
+			FROM_UNIXTIME(S.SCHEDULE_NEXT_SCAN, '%Y-%m-%d %H:%i:%s') AS SCAN_TIME
+		FROM pi_ap_server AP, pi_locations L, pi_targets T
+			LEFT OUTER JOIN pi_schedules S ON T.TARGET_ID = S.SCHEDULE_TARGET_ID AND T.AP_NO = S.AP_NO
+		WHERE 1=1
+		<if test="net_id != '' and net_id != null and type != 3 ">
+		  AND T.NET_ID = #{net_id}
+	    </if>
+	    <if test="type == 3">
+	      AND L.NET_ID = #{net_id}
+		  <!-- AND L.LOCATION_ID = #{location_id} -->
+	    </if>
+		  AND T.AP_NO = AP.AP_NO
+		  AND T.TARGET_ID = L.TARGET_ID
+		  AND AP.IS_SERVER != 1
+		GROUP BY T.AP_NO, 
+		 <choose>
+		 	<when test="type == 3">
+		 		L.LOCATION_ID
+		 	</when>
+		 	<otherwise>
+		 		T.TARGET_ID
+		 	</otherwise>
+		 </choose>
+		) H
+    </select>
+	
+	<select id="selectUpGroupPolicy" parameterType="hashmap" resultType="hashmap">
+		WITH RECURSIVE CTE AS 
+			(SELECT
+					0 AS LEVEL, 
+					G.INSA_CODE,
+					G.TEAM_NAME,
+					G.TEAM_NAME AS FULL_TEAM_NM,
+					G.UP_IDX
+				FROM pi_group G
+				WHERE 1 = 1
+				  AND G.INSA_CODE = #{group_id}
+				UNION ALL
+				SELECT 
+					CTE.LEVEL + 1 AS LEVEL,
+					PG.INSA_CODE,
+					PG.TEAM_NAME,
+					CONCAT(CTE.FULL_TEAM_NM, '>', PG.TEAM_NAME) AS FULL_TEAM_NM,
+					PG.UP_IDX
+				FROM pi_group PG, CTE
+				WHERE PG.INSA_CODE = CTE.UP_IDX
+			)
+			SELECT SNS.NET_ID FROM CTE, skt_net_schedule SNS
+			WHERE CTE.INSA_CODE = SNS.NET_TYPE_ID
+			  AND SNS.NET_TYPE = 1
+			  AND SNS.ENABLE = 'Y'
+			  AND CTE.INSA_CODE != #{group_id}
+			ORDER BY CTE.LEVEL
+			LIMIT 1
+	</select>
+	
+	<select id="selectUpPCPolicy" parameterType="hashmap" resultType="hashmap">
+		WITH RECURSIVE CTE AS 
+			(SELECT
+					0 AS LEVEL, 
+					G.INSA_CODE,
+					G.TEAM_NAME,
+					G.TEAM_NAME AS FULL_TEAM_NM,
+					G.UP_IDX
+				FROM pi_group G
+				WHERE 1 = 1
+				  AND G.INSA_CODE = (SELECT U.INSA_CODE FROM PI_TARGET_USER TU, PI_USER U WHERE TU.TARGET_ID = #{group_id} AND TU.AP_NO = #{ap_no} AND TU.USER_NO = U.USER_NO)
+				UNION ALL
+				SELECT 
+					CTE.LEVEL + 1 AS LEVEL,
+					PG.INSA_CODE,
+					PG.TEAM_NAME,
+					CONCAT(CTE.FULL_TEAM_NM, '>', PG.TEAM_NAME) AS FULL_TEAM_NM,
+					PG.UP_IDX
+				FROM pi_group PG, CTE
+				WHERE PG.INSA_CODE = CTE.UP_IDX
+			)
+			SELECT SNS.NET_ID FROM CTE, skt_net_schedule SNS
+			WHERE CTE.INSA_CODE = SNS.NET_TYPE_ID
+			  AND SNS.NET_TYPE = 1
+			  AND SNS.ENABLE = 'Y'
+			ORDER BY CTE.LEVEL
+			LIMIT 1
+	</select>
+	
+	
+	<!-- PC 정책 삭제시(그룹), 상위 그룹이 없을경우, 망정책으로 변경 -->
+	<update id="updateUpNetwork" parameterType="hashmap">
+		UPDATE PI_TARGETS T, SKT_NET_SCHEDULE SNS
+		   SET T.NET_ID = SNS.NET_ID
+		WHERE T.NET_ID = #{NET_ID}
+		  AND CONCAT('TYPE',T.NET_TYPE) = SNS.NET_TYPE_ID
+		  AND SNS.NET_TYPE = 0
+		  AND SNS.ENABLE = 'Y'
+	</update>
+	
+	<select id="selectUserSearchCount" parameterType="hashmap" resultType="hashmap">
+		SELECT LPAD(COUNT(*)+1, '2', '0') AS COUNT
+		FROM pi_schedule_group G
+		WHERE DATE_FORMAT(G.REGDATE, '%Y%m%d') = DATE_FORMAT(NOW(), '%Y%m%d')
+		AND G.USER_NO = #{user_no}
+	</select>
+	
+	<!-- 네트워크 -->
+	<select id="netList" parameterType="hashmap" resultType="hashmap">
+		SELECT SNI.TYPE, SNI.TYPE_NAME, IFNULL(SNI.TYPE_CLASS, '-') AS TYPE_CLASS,
+			   SNI.IP, SNI.MASK, SNI.MASK_IP, DATE_FORMAT(SNI.REGDATE,'%Y-%m-%d %H:%i:%s') AS REGDATE
+		FROM SKT_NET_IP SNI
+		WHERE 1=1
+		<if test="net_type != null and net_type != 0 and net_type != ''">
+			AND SNI.TYPE = #{net_type}
+		</if>
+		<if test="net_ip != null and net_ip != ''">
+			AND SNI.IP LIKE CONCAT('%', #{net_ip}, '%')
+		</if>
+		<if test="net_type_class != null and net_type_class != ''">
+			AND SNI.TYPE_CLASS LIKE CONCAT('%', #{net_type_class}, '%')
+		</if>
+		<if test='fromDate != "" and fromDate != null'>
+			AND SNI.REGDATE BETWEEN CONCAT(#{fromDate},' 00:00:00') AND CONCAT(#{toDate},' 23:59:59')
+		</if>
+		ORDER BY TYPE
+	</select>
+	
+	<insert id="insertNetIp" parameterType="hashmap">
+		INSERT INTO SKT_NET_IP
+			(TYPE, TYPE_NAME, TYPE_CLASS, IP, MASK, MASK_IP, REGDATE)
+		VALUES
+			(#{type}, #{type_name}, #{type_class}, #{ip}, #{mask}, #{mask_ip}, NOW())
+	</insert>
+	
+	<update id="updateNetIp" parameterType="hashmap">
+		UPDATE SKT_NET_IP SET
+			TYPE = ${type},
+			TYPE_NAME = #{type_name},
+			TYPE_CLASS = #{type_class},
+			IP = #{ip},
+			MASK = #{mask},
+			MASK_IP = #{mask_ip}
+		WHERE 1=1
+			AND IP = #{reachNet_Ip}
+			AND MASK = #{reachNetMask}
+	</update>
+	
+	<delete id="deleteNetIp" parameterType="hashmap">
+		DELETE FROM skt_net_ip
+		WHERE IP = #{ip}
+			AND MASK = #{mask}
+	</delete>
+	
+	<update id="updateScheduleStatus" parameterType="hashmap">
+		UPDATE pi_schedules SET
+			SCHEDULE_STATUS = #{changedTask}
+		WHERE SCHEDULE_ID = #{id}
+			AND AP_NO = #{ap_no}
+	</update>
+	
+	<update id="deleteNetId" parameterType="hashmap">
+		UPDATE PI_TARGETS T SET
+			T.NET_ID  = NULL	
+		WHERE 1=1
+			<if test="beforeType == 0">
+				AND T.NET_TYPE = #{beforeRangeId}
+			</if>
+			<if test="beforeType == 2">
+				AND T.TARGET_ID = #{beforeRangeId}
+			</if>
+	</update>
+	
+	<update id="deleteNetGroup" parameterType="hashmap">
+		UPDATE pi_targets T, 
+			(SELECT * FROM 
+			(WITH RECURSIVE CTE AS 
+			(SELECT
+					0 AS LEVEL, 
+					G.INSA_CODE,
+					G.TEAM_NAME,
+					G.TEAM_NAME AS FULL_TEAM_NM,
+					G.UP_IDX
+				FROM pi_group G
+				WHERE 1 = 1
+				  AND G.INSA_CODE = #{beforeRangeId}
+				UNION ALL
+				SELECT 
+					CTE.LEVEL + 1 AS LEVEL,
+					PG.INSA_CODE,
+					PG.TEAM_NAME,
+					CONCAT(CTE.FULL_TEAM_NM, '>', PG.TEAM_NAME) AS FULL_TEAM_NM,
+					PG.UP_IDX
+				FROM pi_group PG, CTE
+				WHERE PG.UP_IDX = CTE.INSA_CODE
+			)
+			SELECT TU.TARGET_ID,
+				TU.AP_NO
+			FROM CTE, pi_user U, pi_target_user TU
+			WHERE CTE.INSA_CODE = U.INSA_CODE
+			  AND TU.USER_NO = U.USER_NO
+			  AND TU.AP_NO != 0) AS D) D
+		SET T.NET_ID = NULL
+		WHERE 1 = 1
+		  AND T.TARGET_ID = D.TARGET_ID
+		  AND T.AP_NO = D.AP_NO
+	</update>
+	
+	<update id="deleteOneDriveNetId" parameterType="hashmap">
+		UPDATE PI_LOCATIONS SET
+			NET_ID = NULL
+		WHERE 1=1
+			AND NET_ID = #{net_id}
+	</update>
+	
+	<update id="deleteOneDriveNetId2" parameterType="hashmap">
+		UPDATE SKT_NET_SCHEDULE SET
+			LOCATION_ID  = NULL
+		WHERE NET_ID =#{net_id}
+	</update>
+	
+	<!-- 데이터 여부 확인 -->
+	<select id="selectNetMask" parameterType="hashmap" resultType="int">
+	 	SELECT IFNULL(COUNT(NI.IP), 0)
+		FROM skt_net_ip NI
+		WHERE NI.MASK = #{mask}
+			AND NI.IP IN 
+		<foreach collection="IPList" item="item" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+	 </select>
+	 
+	<!-- 데이터 여부 확인 -->
+	<select id="selectNetIpCheck" parameterType="hashmap" resultType="int">
+	 	SELECT IFNULL(COUNT(NI.IP), 0)
+		FROM skt_net_ip NI
+		WHERE NI.MASK = #{mask}
+			AND NI.IP = #{ip}
+	 </select>
+	 
+	 <!-- 네트워크 관리 일괄 insert -->
+	 <insert id="insertNetList" parameterType="hashmap">
+	 	INSERT INTO SKT_NET_IP (TYPE, TYPE_NAME, TYPE_CLASS, IP, MASK, MASK_IP, REGDATE)
+		VALUES
+		( #{type}, #{type_name}, #{type_class}, #{ip}, #{mask}, #{mask_ip}, NOW())
+		ON DUPLICATE KEY UPDATE
+			IP = #{ip}
+	 </insert>
+	 
+	 <select id="selectTargetIdAll" parameterType="hashmap" resultType="hashmap">
+	 	SELECT AP.AP_NO, AP.IP
+		FROM PI_AP_SERVER AP
+		WHERE AP.NETWORK = #{ap_nm}
+	 </select>
+	 
+	 <select id="selectTargetId" parameterType="hashmap" resultType="hashmap">
+	 	SELECT T.TARGET_ID, AP.AP_NO, AP.IP
+		FROM PI_AP_SERVER AP
+			LEFT OUTER JOIN PI_TARGETS T ON AP.AP_NO = T.AP_NO AND T.TARGET_USE ='Y' AND T.NAME = #{target_name}
+		WHERE AP.NETWORK = #{ap_nm}
+	 </select>
+	
+</mapper>

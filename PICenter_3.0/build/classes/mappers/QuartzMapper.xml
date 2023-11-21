@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="QuartzMapper">
+
+	<!-- mybatis-config.xml의 typeAlias에 등록해두지 않았다면 <select id="selectMember" resultType="com.org.iopts.dto.MemberVO" > SELECT ID, PW ,NAME FROM TEST </select> 이렇게 해야 한다. -->
+
+	<select id="getConnectHistSeq" resultType="Integer">
+     	SELECT NEXT VALUE FOR pi_er2_connect_hist_seq FROM DUAL
+	</select>	
+	
+	<insert id="insConnectHist" parameterType="hashmap">
+		INSERT INTO PI_ER2_CONNECT_HIST (
+			ID, RECON_ID, URL, METHOD, REQ_DATA,
+			SND_DTM
+		) VALUES (
+			#{id}, #{recon_id}, #{url}, #{method}, #{req_data},  
+			DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')
+		)
+	</insert>
+	
+	<update id="uptConnectHist" parameterType="hashmap">
+		UPDATE PI_ER2_CONNECT_HIST SET
+			RSP_DTM = DATE_FORMAT(NOW(), '%Y%m%d%H%i%s'),
+			RSP_CD = #{rsp_cd},
+			RSP_MSG = #{rsp_msg}
+		WHERE 1=1
+			AND ID = #{id}
+			AND RECON_ID = #{recon_id}
+			AND URL = #{url}
+			AND METHOD = #{method}
+	</update>
+
+	<select id="getChangeSchedule" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+			SCHEDULE_ID, ACTIVE_STATUS, WEEKDAY, WORK_HOUR, WORK_CD
+		FROM pi_scan_schedule 
+		WHERE 1=1
+			AND ACTIVE_STATUS = '00'
+			AND WORK_CD REGEXP '01|02'
+			AND WEEKDAY = #{weekday}
+			AND WORK_HOUR = #{work_hour}
+	</select>	
+	
+	<select id="getStopScheduleList" parameterType="String" resultType="hashmap">
+     	SELECT 
+     		SCHEDULE_ID, STOP_DTM
+		FROM pi_scan_schedule
+		WHERE 1=1
+			AND WORK_CD = '03'
+			AND ACTIVE_STATUS = '00'
+			AND STOP_DTM = #{value}
+	</select>	
+	
+	<update id="stopScanSchedule" parameterType="String" >
+		UPDATE PI_SCAN_SCHEDULE SET
+	        ACTIVE_STATUS = '01'
+	       ,UPT_USER_NO = 'cronTab'
+	       ,UPT_DTM = DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')
+		WHERE 1=1
+		 	AND SCHEDULE_ID = #{value}
+		 	AND ACTIVE_STATUS REGEXP '00|02'
+	</update>
+</mapper>

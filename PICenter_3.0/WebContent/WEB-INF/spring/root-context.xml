@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xmlns:mybatis-spring="http://mybatis.org/schema/mybatis-spring"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-4.3.xsd
+		http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring-1.2.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+	
+	<bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+          <property name="locations">
+               <list>
+                    <value>classpath:/property/dbpool.properties</value>
+               </list>
+          </property>
+	</bean>
+	
+	<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource" >
+		<property name="driverClassName" value="${jdbc.driver}" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+	</bean>
+	
+	<!-- mybatis SqlSessionFactoryBean -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource"></property>
+        <property name="configLocation" value="classpath:/mybatis-config.xml"></property>
+		<property name="mapperLocations" value="classpath:mappers/**/*Mapper.xml"></property>
+	</bean>
+	
+    <!-- mybatis -->
+    <bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate" destroy-method="clearCache">
+		<constructor-arg index="0" name="sqlSessionFactory" ref="sqlSessionFactory"></constructor-arg>
+	</bean>
+	
+ 	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    	<property name="dataSource" ref="dataSource" />
+	</bean>
+    
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.org.iopts.**.dao" />
+    </bean>
+    
+    <!-- Spring Bean -->
+    <bean id="quartzService" class="com.org.iopts.service.Pi_QuartzServiceImpl"/>
+    
+    <!-- Quartz 잡 (resume, pause)  -->
+	<bean id="jobScanSchedule" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+	    <!-- 서비스 구현 객체의 빈 이름 -->
+	    <property name="targetObject" ref="quartzService" />
+	    <!-- 서비스 객체 실행 메소드 지정. -->
+	    <property name="targetMethod" value="executeScanSchedule" />
+	    <!-- 동시 실행을 방지합니다. -->
+	    <property name="concurrent" value="false" />
+	</bean>
+	<!-- Quartz 트리거 (resume, pause)  -->
+	<bean id="jobScanScheduleTrigger" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+	    <property name="jobDetail" ref="jobScanSchedule" />
+	    <!-- 1시간 간격 -->
+	    <property name="cronExpression" value="0 0 0/1 * * ?" />
+	</bean>
+	
+    <!-- Quartz 잡 (stop)  -->
+	<bean id="jobStopSchedule" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+	    <!-- 서비스 구현 객체의 빈 이름 -->
+	    <property name="targetObject" ref="quartzService" />
+	    <!-- 서비스 객체 실행 메소드 지정. -->
+	    <property name="targetMethod" value="executeStopSchedule" />
+	    <!-- 동시 실행을 방지합니다. -->
+	    <property name="concurrent" value="false" />
+	</bean>
+	<!-- Quartz 트리거 (stop)  -->
+	<bean id="jobStopScheduleTrigger" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+	    <property name="jobDetail" ref="jobStopSchedule" />
+	    <!-- 1분 간격 -->
+	    <property name="cronExpression" value="0 0/1 * * * ?" />
+	</bean>
+
+	<!-- Quartz 스케줄러 -->
+	<bean id="jobScheduler" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+	    <property name="triggers">
+	        <!-- 앞에서 설정한 트리거를 등록합니다. 필요하면 여러개 만들어서 등록하면 됩니다. -->
+	        <list>
+		        <ref bean="jobScanScheduleTrigger" /> <!--  (resume, pause)  -->
+		        <ref bean="jobStopScheduleTrigger" /> <!--  (stop)  -->
+	        </list>
+	    </property>
+	</bean>
+	
+    <!-- Multipart Resolaver -->
+	<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+	    <property name="maxUploadSize">
+	        <value>100000000</value>    <!-- 50MB -->
+	    </property>
+	    <property name="defaultEncoding" value="UTF-8"/>
+	</bean>
+	
+	<bean id="exceptionResolver" class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+    <property name="exceptionMappings">
+        <props>
+            <prop key="org.springframework.web.multipart.MaxUploadSizeExceededException">/error/attachFileOverSizeErr</prop>
+        </props>
+    </property>
+</bean>
+</beans>

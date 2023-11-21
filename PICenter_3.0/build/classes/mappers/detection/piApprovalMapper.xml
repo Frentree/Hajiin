@@ -1,0 +1,570 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.detection.dao.piApprovalDAO">
+
+    <!-- 정탐/오탐 리스트 조회 -->
+    <select id="searchProcessList" parameterType="hashmap" resultType="hashmap">
+        SELECT DPG.IDX, 
+               T.NAME,
+               IF(SUBSTRING(T.PLATFORM, 1, 5) = 'Apple', SUBSTRING_INDEX(T.NAME, '.', -1), SUBSTRING_INDEX(T.NAME, '.', 1)) AS MAC_NAME,
+			   IF(SUBSTRING(T.PLATFORM, 1, 5) = 'Apple', SUBSTRING_INDEX(T.NAME, '.', 1), null) AS MAC_SERIAL,
+			   T.PLATFORM, 
+               DPG.TARGET_ID,
+               DPG.data_processing_name AS FILENAME, 
+               DATE_FORMAT(DPG.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+               DATE_FORMAT(DPG.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE, 
+			   CASE WHEN DPG.APPROVAL_STATUS = 'E' THEN '완료' 
+		            WHEN DPG.APPROVAL_STATUS = 'D' THEN '반려'
+		            WHEN DPG.APPROVAL_STATUS = 'W' THEN '대기'
+		            ELSE '' END APPROVAL_STATUS,
+               DPG.APPROVAL_STATUS 	AS 	STATUS, 
+               DPG.NOTE, 
+               DPG.USER_NO, DPG.OK_USER_NO,
+               (SELECT AP_NO FROM PI_DATA_PROCESSING DP WHERE DP.DATA_PROCESSING_GROUP_IDX = DPG.IDX LIMIT 1) AS AP_NO,
+               (SELECT DP.NOTEPAD FROM PI_DATA_PROCESSING DP WHERE DP.DATA_PROCESSING_GROUP_IDX = DPG.IDX LIMIT 1) AS BASIS,
+               (SELECT DP.ADD_CONTENT FROM PI_DATA_PROCESSING DP WHERE DP.DATA_PROCESSING_GROUP_IDX = DPG.IDX LIMIT 1) AS ADD_CONTENT
+          FROM PI_DATA_PROCESSING_GROUP AS DPG
+             , pi_targets AS T
+         WHERE T.TARGET_ID = DPG.TARGET_ID
+         <if test="user_grade != 9">
+           AND DPG.USER_NO = (#{user_no})
+         </if>
+           AND DATE_FORMAT(DPG.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test='owner != null and owner != ""'>
+           AND T.NAME LIKE CONCAT('%',#{owner},'%')
+       </if>
+        <if test='filename != null and filename != ""'>
+           AND DPG.data_processing_name LIKE CONCAT('%',#{filename},'%')
+       </if>
+
+		<if test='processingFlag != null and processingFlag != ""'>
+			AND PROCESSING_FLAG = #{processingFlag}
+		</if>
+        <choose>
+            <when test='status != null and status != "" and status == "NR"'>
+                AND (DPG.APPROVAL_STATUS IS NULL OR DPG.APPROVAL_STATUS = '')
+            </when>
+            <otherwise>
+                <if test='status != null and status != ""'>
+                    AND DPG.APPROVAL_STATUS = #{status}
+                </if>
+            </otherwise>
+        </choose>
+        GROUP BY DPG.IDX
+         ORDER BY DPG.REGDATE DESC, DPG.OKDATE DESC
+    </select>
+
+    <select id="selectTeamMember" parameterType="hashmap" resultType="hashmap">
+    	SELECT DISTINCT 
+			U.USER_NO, 
+			U.JIKWEE, 
+			U.JIKGUK, 
+			U.BOSS_NAME, 
+			U.USER_GRADE, 
+			U.USER_NAME,
+			U.USER_PHONE, 
+			U.INSA_CODE, 
+			G.TEAM_NAME, 
+			U.REGDATE,
+			G.TEAM_NAME AS OFFICE_NM
+		FROM PI_USER U, PI_GROUP G
+		WHERE U.INSA_CODE = G.INSA_CODE
+		  AND U.USER_NO != #{user_no}
+		  AND USER_GRADE IN (6,7)
+		ORDER BY 
+			U.INSA_CODE = #{insa_code} DESC,
+			U.JIKWEE
+		<!-- SELECT DISTINCT 
+			   U.USER_NO, 
+		       U.JIKWEE, 
+		       U.JIKGUK, 
+		       U.BOSS_NAME, 
+		       U.USER_GRADE, 
+		       U.USER_NAME, 
+		       U.INSA_CODE, 
+		       G.TEAM_NAME, 
+		       U.REGDATE,
+		       A.OFFICE_NM
+		  FROM PI_USER U, PI_GROUP G, PI_ACCOUNT_INFO A
+		 WHERE U.INSA_CODE = G.INSA_CODE 
+		   AND U.INSA_CODE = #{insa_code}
+		   AND U.USER_NO != #{user_no}
+		   AND USER_GRADE > 0
+		   AND U.USER_NO = A.USER_ID
+		   ORDER BY 
+		   A.OFFICE_NM = (SELECT DISTINCT ACC.OFFICE_NM FROM PI_ACCOUNT_INFO ACC WHERE ACC.USER_ID = #{user_no} AND ACC.OFFICE_NM IS NOT NULL) DESC,
+		   A.OFFICE_NM DESC,
+		   U.JIKWEE -->
+    </select>
+
+	<!-- 기안자 검색  -->
+    <select id="searchTeamMember" parameterType="hashmap" resultType="hashmap">
+    	SELECT DISTINCT 
+			U.USER_NO, 
+			U.JIKWEE, 
+			U.JIKGUK, 
+			U.BOSS_NAME, 
+			U.USER_GRADE, 
+			U.USER_NAME, 
+			U.INSA_CODE, 
+			G.TEAM_NAME, 
+			U.REGDATE,
+			U.USER_PHONE,
+			G.TEAM_NAME AS OFFICE_NM
+		FROM PI_USER U, PI_GROUP G
+		WHERE U.INSA_CODE = G.INSA_CODE
+		  <!-- AND U.USER_NO != #{user_no} -->
+		  AND USER_GRADE NOT IN (0)
+		 <if test="searchTeamName != null and searchTeamName != ''">
+			AND G.TEAM_NAME LIKE CONCAT('%', #{searchTeamName}, '%')
+		</if>
+		 <if test="searchName != null and searchName != ''">
+			AND U.USER_NAME LIKE CONCAT('%', #{searchName}, '%')
+		</if>
+		ORDER BY 
+			U.INSA_CODE = #{insa_code} DESC,
+			U.JIKWEE
+    </select>
+    <select id="selectDocuNum" parameterType="hashmap" resultType="hashmap">
+        SELECT IFNULL(COUNT(*), 0) + 1 AS SEQ
+          FROM pi_data_processing_charge_group
+         WHERE user_no = #{user_no}
+           AND DATE_FORMAT(REGDATE,'%Y%m%d') = #{today}
+    </select>
+
+    <select id="selectProcessPath" parameterType="hashmap" resultType="hashmap">
+       SELECT DP.hash_id,
+       		  DP.TARGET_ID,
+              DPG.idx AS CHARGE_ID,
+              (SELECT processing_flag_name 
+                   FROM pi_data_processing_flag 
+                   WHERE processing_flag = DP.processing_flag) AS FLAG,
+              DP.user_no,
+              DPG.data_processing_name, 
+              F.PATH,
+              <!-- 20201120 추가 -->
+              CASE IFNULL(F.FID,'X') != 'X' WHEN 0 THEN 1 ELSE 0 END AS FID,
+              <!-- 20201120 추가 -->
+              <!-- 20201120 추가 -->
+              DP.AP_NO	AS AP_NO
+              <!-- 20201120 추가 -->
+         FROM PI_FIND AS F
+             ,pi_data_processing AS DP
+             ,pi_data_processing_group AS DPG
+        WHERE 1=1
+          AND DP.target_id = F.target_id
+          AND DP.group_id = F.group_id
+          AND DP.hash_id = F.hash_id
+          AND DP.AP_NO = F.AP_NO
+          AND DPG.idx = DP.data_processing_group_idx 
+          AND DPG.target_id = DP.target_id 
+          AND DPG.idx = #{data_processing_group_idx}
+          <if test="user_grade != 9">
+          	AND DP.USER_NO = #{user_no}
+          </if>
+    </select>
+
+    <insert id="registProcessCharge" parameterType="hashmap">
+        INSERT INTO pi_data_processing_charge_group (
+            data_processing_charge_name, 
+            user_no, 
+            ok_user_no, 
+            approval_status, 
+            REGDATE, 
+            OKDATE, 
+            reason, 
+            return_reason
+        )
+        values (
+            CONCAT(#{today}, "_" , #{user_no}, "_" , #{doc_seq}),
+            #{user_no},
+            #{ok_user_no}, 
+            #{apprType}, 
+            NOW(),
+            NULL, 
+            #{comment}, 
+            NULL
+        )
+        <selectKey resultType="int" keyProperty="DATA_PROCESSING_CHARGE_ID" order="AFTER">
+			SELECT LAST_INSERT_ID() AS DATA_PROCESSING_CHARGE_ID
+		</selectKey>
+    </insert>
+    
+    <update id="updateProcessCharge" parameterType="hashmap" >
+    	UPDATE pi_data_processing_charge_group
+    	   SET URL = #{url}
+    	WHERE DATA_PROCESSING_CHARGE_ID = #{DATA_PROCESSING_CHARGE_ID}
+    </update>
+    
+    <delete id="deleteProcessCharge" parameterType="hashmap">
+    	DELETE FROM pi_data_processing_charge_group WHERE DATA_PROCESSING_CHARGE_ID = #{DATA_PROCESSING_CHARGE_ID}
+    </delete>
+    
+    <select id="selectDataProcessingChargeId" parameterType="hashmap" resultType="String">
+    	SELECT data_processing_charge_id FROM pi_data_processing_charge_group
+    	WHERE data_processing_charge_name = CONCAT(#{today}, "_" , #{user_no}, "_" , #{doc_seq})
+    </select>
+    
+    <update id="updateProcessingGroupStatus">
+        UPDATE PI_DATA_PROCESSING_GROUP DPG
+           SET DPG.OK_USER_NO = #{ok_user_no},
+               DPG.OKDATE = NOW(),
+               DPG.APPROVAL_STATUS = #{apprType},
+               DPG.data_processing_charge_id = #{data_processing_charge_id},
+               DPG.NOTE = #{comment}
+         WHERE DPG.USER_NO = #{user_no}
+           AND DPG.IDX = #{idx}
+    </update>
+
+    <update id="updateProcessingStatus">
+        UPDATE PI_DATA_PROCESSING DP
+           SET DP.OKUSER_NO = #{ok_user_no},
+               DP.OKDATE = NOW(),
+               DP.APPROVAL_STATUS = #{apprType}
+         WHERE DP.USER_NO = #{user_no}
+           AND DP.DATA_PROCESSING_GROUP_IDX = #{idx}
+    </update>
+
+    <update id="approvalPlus" parameterType="hashmap">
+        UPDATE pi_account_info SET 
+               approval_id = approval_id + 1
+         WHERE user_id = (#{user_no})
+    </update>
+
+    <!-- 결재관리 - 정탐/오탐 결재 리스트 조회 -->
+    <select id="searchApprovalAllListData" parameterType="hashmap" resultType="hashmap">
+		SELECT DPG.idx AS GROUP_ID,
+		       DPCG.data_processing_charge_id AS CHARGE_ID,
+		       DPCG.data_processing_charge_name AS CHARGE_NAME, 
+		       DPG.user_no,
+		       DPG.data_processing_name,
+		       (SELECT processing_flag_name 
+		          FROM pi_data_processing_flag 
+		         WHERE processing_flag = DPG.processing_flag) AS FLAG,
+		        F.PATH
+		  FROM PI_FIND AS F
+		      ,pi_data_processing AS DP
+		      ,pi_data_processing_group AS DPG
+		      ,PI_DATA_PROCESSING_CHARGE_GROUP AS DPCG
+		 WHERE 1=1
+		   AND DP.target_id = F.target_id
+		   AND DP.group_id = F.group_id
+		   AND DP.hash_id = F.hash_id
+		   AND DPG.idx = DP.data_processing_group_idx
+		   AND DPG.target_id = DP.target_id
+		   AND DPCG.APPROVAL_STATUS = 'W'
+		 AND DPG.data_processing_charge_id = DPCG.data_processing_charge_id
+		 AND DPG.OK_USER_NO = #{user_no}
+		 ORDER BY DPCG.data_processing_charge_id DESC, DPG.idx
+    </select>
+
+    <!-- 결재관리 - 정탐/오탐 결재 리스트 조회 -->
+    <select id="searchApprovalListData" parameterType="hashmap" resultType="hashmap">
+    	SELECT '0' CHK,
+    		DPCG.data_processing_charge_id AS CHARGE_ID,
+            DPCG.data_processing_charge_name AS PATH, 
+            DPCG.USER_NO, 
+            PU.USER_NAME,
+            DPCG.OK_USER_NO,
+    		(SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = DPCG.ok_user_no) AS OK_USER_NAME,
+            DPCG.ADMIN_USER_NO,
+    		(SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = DPCG.ADMIN_USER_NO) AS ADMIN_USER_NAME,
+    		DATE_FORMAT(DPCG.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+            DATE_FORMAT(DPCG.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE, 
+    		DPCG.APPROVAL_STATUS,
+    		DPG.TARGET_ID,
+    		DPG.NOTE
+      	FROM PI_DATA_PROCESSING_CHARGE_GROUP AS DPCG
+      		LEFT OUTER JOIN PI_USER AS PU ON PU.USER_NO = DPCG.USER_NO
+      		LEFT OUTER JOIN PI_DATA_PROCESSING_GROUP DPG ON DPG.USER_NO = DPCG.USER_NO AND DPG.DATA_PROCESSING_CHARGE_ID = DPCG.DATA_PROCESSING_CHARGE_ID
+      	WHERE 1 = 1
+        <if test='status != null and status != ""'>
+           AND DPCG.APPROVAL_STATUS = #{status}
+        </if>
+           AND DATE_FORMAT(DPCG.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test='user_nm != null and user_nm != ""'>
+           AND PU.USER_NAME LIKE CONCAT('%',#{user_nm},'%')
+       </if>
+        <if test='path != null and path != ""'>
+           AND DPCG.data_processing_charge_name LIKE CONCAT('%',#{path},'%')
+       </if>
+
+        <choose>
+            <when test='user_grade != 0'>
+                <if test='user_grade != 9'>
+               		AND (DPCG.USER_NO = #{user_no} OR DPCG.OK_USER_NO = #{user_no} OR DPCG.ADMIN_USER_NO = #{user_no}  )
+                </if>
+            </when>
+            <otherwise>
+                AND DPCG.USER_NO = #{user_no}
+            </otherwise>
+        </choose>
+         GROUP BY DPCG.DATA_PROCESSING_CHARGE_ID
+         ORDER BY DPCG.REGDATE DESC, DPCG.OKDATE DESC	  
+        <!-- SELECT 
+        	   DISTINCT
+        	   '0' AS CHK,
+               DPCG.data_processing_charge_id AS CHARGE_ID,
+               DPCG.data_processing_charge_name AS PATH, 
+               DPCG.USER_NO, 
+               PU.USER_NAME,
+               DPCG.OK_USER_NO, 
+               (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = DPCG.ok_user_no) AS OK_USER_NAME,  
+               DATE_FORMAT(DPCG.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+               DATE_FORMAT(DPCG.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE, 
+               DPCG.APPROVAL_STATUS, 
+      		   DPG.NOTE AS REASON,
+      		   DP.AP_NO	AS AP_NO
+          FROM PI_DATA_PROCESSING_CHARGE_GROUP AS DPCG
+               LEFT OUTER JOIN PI_USER AS PU
+                 ON PU.USER_NO = DPCG.USER_NO
+               LEFT OUTER JOIN pi_data_processing_group AS DPG
+		 		 ON DPCG.data_processing_charge_id = DPG.data_processing_charge_id
+		 	   LEFT OUTER JOIN pi_data_processing AS DP 
+		 	     ON DPG.idx = DP.data_processing_group_idx
+         WHERE 1 = 1
+        <if test='status != null and status != ""'>
+           AND DPCG.APPROVAL_STATUS = #{status}
+        </if>
+           AND DATE_FORMAT(DPCG.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test='user_nm != null and user_nm != ""'>
+           AND PU.USER_NAME LIKE CONCAT('%',#{user_nm},'%')
+       </if>
+        <if test='path != null and path != ""'>
+           AND DPCG.data_processing_charge_name LIKE CONCAT('%',#{path},'%')
+       </if>
+
+        <choose>
+            <when test='user_grade != 0'>
+                AND (DPCG.USER_NO = #{user_no} OR DPCG.OK_USER_NO = #{user_no})
+            </when>
+            <otherwise>
+                AND DPCG.USER_NO = #{user_no}
+            </otherwise>
+        </choose>
+         ORDER BY DPCG.REGDATE DESC, DPCG.OKDATE DESC -->
+        <!-- SELECT '0' AS CHK,											비고란 수정 관련 주석 처리
+               DPCG.data_processing_charge_id AS CHARGE_ID,
+               DPCG.data_processing_charge_name AS PATH, 
+               DPCG.USER_NO, 
+               PU.USER_NAME,
+               DPCG.OK_USER_NO, 
+               (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = DPCG.ok_user_no) AS OK_USER_NAME,  
+               DATE_FORMAT(DPCG.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+               DATE_FORMAT(DPCG.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE, 
+               DPCG.APPROVAL_STATUS, 
+               DPCG.REASON
+          FROM PI_DATA_PROCESSING_CHARGE_GROUP AS DPCG
+               LEFT OUTER JOIN PI_USER AS PU
+                 ON PU.USER_NO = DPCG.USER_NO
+         WHERE 1 = 1
+        <if test='status != null and status != ""'>
+           AND DPCG.APPROVAL_STATUS = #{status}
+        </if>
+           AND DATE_FORMAT(DPCG.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test='user_nm != null and user_nm != ""'>
+           AND PU.USER_NAME LIKE CONCAT('%',#{user_nm},'%')
+       </if>
+        <if test='path != null and path != ""'>
+           AND DPCG.data_processing_charge_name LIKE CONCAT('%',#{path},'%')
+       </if>
+
+        <choose>
+            <when test='user_grade != 0'>
+                AND (DPCG.USER_NO = #{user_no} OR DPCG.OK_USER_NO = #{user_no})
+            </when>
+            <otherwise>
+                AND DPCG.USER_NO = #{user_no}
+            </otherwise>
+        </choose>
+         ORDER BY DPCG.REGDATE DESC, DPCG.OKDATE DESC -->
+    </select>
+
+    <select id="selectProcessGroupPath" parameterType="hashmap" resultType="hashmap">
+        SELECT DPG.idx AS CHARGE_ID,
+        	   DP.TARGET_ID,
+		       DPG.user_no,
+		       DPG.data_processing_name,
+		       (SELECT processing_flag_name 
+		          FROM pi_data_processing_flag 
+		         WHERE processing_flag = DPG.processing_flag) AS FLAG,
+		        F.PATH,
+		        <!-- 20201120 추가 -->
+		        DPG.APPROVAL_STATUS AS STATUS,
+		        DPG.REASON AS REASON,
+		        DPG.RETURN_REASON AS RETURN_REASON,
+		        CASE IFNULL(F.FID,'X') != 'X' WHEN 0 THEN 1 ELSE 0 END AS FID,
+		        F.HASH_ID AS ID,
+		        <!-- 20201120 추가 -->
+		        <!-- 20201120 추가 -->
+		        DP.AP_NO AS AP_NO,
+		        <!-- 20201120 추가 -->
+		        IFNULL(DPG.NOTEPAD,'') AS NOTEPAD
+          FROM PI_FIND AS F
+		      ,pi_data_processing AS DP
+		      ,pi_data_processing_group AS DPG
+         WHERE 1=1
+           AND DP.AP_NO = F.AP_NO
+		   AND DP.target_id = F.target_id
+		   AND DP.hash_id = F.hash_id
+		   AND DPG.idx = DP.data_processing_group_idx
+		   AND DPG.target_id = DP.target_id
+           AND DPG.data_processing_charge_id IN
+        <foreach item="charge_id_list" index="index" collection="charge_id_list" open="(" separator="," close=")">
+                #{charge_id_list}
+        </foreach>
+
+        <!-- <choose>
+            <when test='user_grade == 0'>
+                AND DPG.USER_NO = #{user_no}
+            </when>
+            <otherwise>
+                AND DPG.OK_USER_NO = (#{user_no})
+            </otherwise>
+        </choose> -->
+         ORDER BY DPG.idx
+    </select>
+
+    <select id="selectDataProcessingGroupId" parameterType="hashmap" resultType="hashmap">
+        SELECT idx AS GROUP_ID
+          FROM PI_DATA_PROCESSING_GROUP
+         WHERE data_processing_charge_id = #{chargeIdList}
+    </select>
+
+    <update id="updateProcessApproval" parameterType="hashmap">
+        UPDATE PI_DATA_PROCESSING_CHARGE_GROUP DPC, PI_DATA_PROCESSING_GROUP DPG 
+           SET DPC.OK_USER_NO = #{user_no},
+               DPC.OKDATE = NOW(),
+               DPC.APPROVAL_STATUS = #{apprType},
+               DPG.APPROVAL_STATUS = #{apprType},
+            <if test='apprType == "D"'>
+               DPC.return_reason = #{reason},
+               DPG.return_reason = #{reason}
+            </if>
+            <!-- <if test='apprType == "E"'>
+               DPC.reason = #{reason},
+               DPG.reason = #{reason}
+            </if> -->
+            <if test='apprType == "E"'>
+               DPC.reason = #{reason},
+               DPG.reason = #{reason}
+            </if>
+         WHERE DPC.data_processing_charge_id = #{chargeIdList}
+           AND DPG.data_processing_charge_id = #{chargeIdList}
+    </update>
+
+    <update id="updateDataProcessing" parameterType="hashmap">
+        UPDATE PI_DATA_PROCESSING 
+	       SET APPROVAL_STATUS = #{apprType},
+	           OKDATE = NOW(),
+	           OKUSER_NO = #{user_no}
+	     WHERE data_processing_group_idx = #{group_id}
+    </update>
+
+    <select id="selectScanPolicy" parameterType="hashmap" resultType="hashmap">
+		SELECT IDX,
+               POLICY_NAME,
+               POLICY_VERSION,
+               REGDATE,
+               COMMENT,
+               DATATYPE_ID,
+               SCHEDULE_LABEL,
+               SCHEDULE_PAUSE_DAYS,
+               SCHEDULE_PAUSE_MONTH,
+               SCHEDULE_PAUSE_FROM,
+               SCHEDULE_PAUSE_TO,
+               SCHEDULE_CPU,
+               SCHEDULE_DATA,
+               SCHEDULE_MEMORY,
+               SCHEDULE_TRACE,
+               DMZ,
+               MANAGE,
+               DEVELOP,
+               DEFAULT_CHECK
+		  FROM PI_SCAN_POLICY
+		 WHERE 1=1
+		   AND default_check = 1
+    </select>
+
+    <select id="selectReScanTarget" parameterType="hashmap" resultType="hashmap">
+        SELECT DPG.IDX, 
+               DPG.TARGET_ID,
+		       L.LOCATION_ID,
+               F.PATH
+          FROM PI_DATA_PROCESSING_GROUP AS DPG
+              ,PI_DATA_PROCESSING AS DP
+              ,PI_FIND F
+              ,PI_TARGETS T
+              ,PI_LOCATIONS L
+         WHERE 1=1
+           AND DP.DATA_PROCESSING_GROUP_IDX = DPG.IDX
+           AND F.GROUP_ID = DP.GROUP_ID
+           AND F.TARGET_ID = DP.TARGET_ID
+           AND F.HASH_ID = DP.HASH_ID
+           AND T.TARGET_ID = DPG.TARGET_ID
+           AND T.GROUP_ID = L.GROUP_ID
+           AND T.TARGET_ID = L.TARGET_ID
+           AND L.DESCRIPTION = 'All local files'
+           AND DPG.IDX IN
+        <foreach item="group_list" index="index" collection="group_list" open="(" separator="," close=")">
+                #{group_list}
+        </foreach>
+    </select>
+    
+    <delete id="deleteItem">
+    	DELETE DPG, DP
+		  FROM pi_data_processing_group AS DPG JOIN pi_data_processing AS DP
+			ON DPG.idx = DP.data_processing_group_idx
+		 WHERE DPG.idx = #{idx}
+    
+    </delete>
+    
+    <select id="selectProcessingSeq" resultType="hashmap">
+		SELECT DPS.ID AS ID, 
+			LPAD(IFNULL(DPS.ID,0)+1, 10,0) AS ID_LENGTH, 
+			DPS.USER_NO AS USER_NO, 
+			(SELECT U.USER_NAME FROM PI_USER U WHERE 1 = 1 AND U.USER_NO = #{user_no}) AS USER_NAME,
+			DATE_FORMAT(DPS.REGDATE, '%Y%m%d') AS REGDATE
+		FROM pi_data_processing_seq DPS 
+		WHERE DPS.REGDATE = DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00')
+		UNION ALL
+		SELECT 0, 
+			LPAD(1, 10,0) AS ID_LENGTH,  
+			'', 
+			(SELECT U.USER_NAME FROM PI_USER U WHERE 1 = 1 AND U.USER_NO = #{user_no}) AS USER_NAME,
+			DATE_FORMAT(NOW(), '%Y%m%d') 
+		ORDER BY ID DESC
+		LIMIT 1
+    </select>
+    
+    <insert id="insertProcessingSeq" parameterType="hashmap">
+    	INSERT INTO PI_DATA_PROCESSING_SEQ (ID, USER_NO, REGDATE)
+    	VALUES (#{index}, #{user_no}, DATE_FORMAT(NOW(),'%Y-%m-%d 00:00:00'))
+    </insert>
+    
+    <select id="selectApprovalCount" parameterType="hashmap" resultType="hashmap">
+    	SELECT 
+			D.TARGET_ID,
+			D.NAME,
+			COUNT(D.PROCESSING_FLAG) AS RESULT_CNT,
+			D.PROCESSING_FLAG_NAME
+		FROM
+			(SELECT DP.TARGET_ID,
+			T.NAME,
+			DP.DATA_PROCESSING_GROUP_IDX,
+			DP.PROCESSING_FLAG,
+			DF.PROCESSING_FLAG_NAME
+			FROM pi_data_processing AS DP, pi_targets T, pi_data_processing_flag DF
+			WHERE 1 = 1
+			  AND DP.data_processing_group_idx IN 
+			  <foreach collection="idxList" open="(" close=")" separator="," item="item">
+			  	#{item}
+			  </foreach>
+			  AND T.TARGET_ID = DP.TARGET_ID
+			  AND T.AP_NO = DP.AP_NO
+			  AND DF.PROCESSING_FLAG = DP.PROCESSING_FLAG) AS D
+		GROUP BY D.TARGET_ID, D.PROCESSING_FLAG
+		ORDER BY D.NAME
+    </select>
+</mapper>

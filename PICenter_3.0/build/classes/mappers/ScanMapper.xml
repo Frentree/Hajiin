@@ -1,0 +1,680 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="ScanMapper">
+
+	<!-- mybatis-config.xml의 typeAlias에 등록해두지 않았다면 <select id="selectMember" resultType="com.org.iopts.dto.MemberVO" > SELECT ID, PW ,NAME FROM TEST </select> 이렇게 해야 한다. -->
+
+	<select id="selectSchedules" parameterType="hashmap" resultType="hashmap">
+		SELECT SCH.SCHEDULE_ID, SCH.SCHEDULE_LABEL, SCH.SCHEDULE_STATUS, SCH.SCHEDULE_STATUS AS SCHEDULE_STAT, SCH.SCHEDULE_REPEAT_DAYS, SCH.SCHEDULE_REPEAT_MONTHS,
+          		SCH.SCHEDULE_TARGET_ID,
+          		(SELECT LOWER(NAME) FROM PI_TARGETS WHERE TARGET_ID = SCH.SCHEDULE_TARGET_ID) AS SCHEDULE_TARGET_NAME,
+          		<!-- CASE F_GET_SCH_TARGET_CNT(SCH.SCHEDULE_ID) WHEN 1 
+          			THEN IF(
+          				SCH.SCHEDULE_TARGET_NAME = '' OR SCH.SCHEDULE_TARGET_NAME = NULL,
+						(SELECT LOWER(NAME) FROM PI_TARGETS WHERE TARGET_ID = SCH.SCHEDULE_TARGET_ID),
+						LOWER(SCH.SCHEDULE_TARGET_NAME)
+ 					) 
+          			ELSE CONCAT(F_GET_SCH_TARGET_CNT(SCH.SCHEDULE_ID), ' Targets') 
+          		END AS SCHEDULE_TARGET_NAME, -->
+          		(SELECT DATATYPE_LABEL FROM PI_DATATYPES WHERE DATATYPE_ID = SCH.SCHEDULE_DATATYPE_PROFILES) AS DATATYPE_LABEL,
+          		SCH.SCHEDULE_DATATYPE_PROFILES,
+          		SCH.SCHEDULE_NEXT_SCAN, 
+		      	DATE_FORMAT(FROM_UNIXTIME(SCH.SCHEDULE_NEXT_SCAN), '%Y-%m-%d %h:%i:%s') AS SCHEDULE_NEXT_SCAN_DATE,
+            	CASE SCH.SCHEDULE_STATUS WHEN 'scheduled' THEN DATE_FORMAT(FROM_UNIXTIME(SCH.SCHEDULE_NEXT_SCAN), '%Y-%m-%d %h:%i:%s') 
+                                     	WHEN 'scanning' THEN DATE_FORMAT(FROM_UNIXTIME(SCH.SCHEDULE_NEXT_SCAN), '%Y-%m-%d %h:%i:%s') 
+                                     	WHEN 'paused' THEN DATE_FORMAT(FROM_UNIXTIME(SCH.SCHEDULE_NEXT_SCAN), '%Y-%m-%d %h:%i:%s') 
+                                     	ELSE '' END  AS SCHEDULE_NEXT_SCAN_DATE_STATUS,
+          		SCH.SCHEDULE_CPU, SCH.SCHEDULE_CAPTURE, SCH.SCHEDULE_TRACE, SCH.SCHEDULE_PAUSE_DAYS, 
+          		SCH.SCHEDULE_PAUSE_TO, SCH.SCHEDULE_PAUSE_FROM,
+          		SCH.AP_NO 
+     	  FROM PI_SCHEDULES SCH
+     	   <if test="user_no != null and user_no != ''">
+     	   LEFT OUTER JOIN pi_target_user u ON SCH.schedule_target_id = U.TARGET_ID
+           </if>
+     	 WHERE 1 = 1
+     	   <if test="fromDate != null and fromDate != ''">
+     	   AND SCHEDULE_NEXT_SCAN BETWEEN UNIX_TIMESTAMP(CONCAT(#{fromDate},' 00:00:00')) AND UNIX_TIMESTAMP(CONCAT(#{toDate},' 23:59:59'))
+           </if>
+     	   <if test="searchType != null and searchType.size != 0">
+     	   AND SCH.SCHEDULE_STATUS IN
+     	    (
+     	    'scanning',
+			'pause',
+			'paused',
+			'notscanned',
+     	    <!--  open="(" close=")" -->
+			<foreach collection="searchType" item="item" index="index" separator=",">
+				#{item}
+			</foreach>
+			)
+           </if>
+           <if test="hostName != null and hostName != ''">
+           AND SCH.SCHEDULE_ID IN (SELECT SCH_ID FROM PI_SCHEDULED_LOCATION WHERE TARGET_ID IN (SELECT TARGET_ID FROM PI_TARGETS WHERE NAME LIKE CONCAT('%', #{hostName}, '%')))
+           </if>
+           <if test="user_no != null and user_no != ''">
+     	   AND U.USER_NO = #{user_no}
+           </if>
+		 ORDER BY SCHEDULE_NEXT_SCAN DESC, SCHEDULE_STATUS DESC, SCHEDULE_LABEL
+		<!-- SELECT SCH.SCHEDULE_ID, SCH.SCHEDULE_LABEL, SCH.SCHEDULE_STATUS, SCH.SCHEDULE_REPEAT_DAYS, SCH.SCHEDULE_REPEAT_MONTHS,
+          		SCH.SCHEDULE_TARGET_ID,
+          		CASE F_GET_SCH_TARGET_CNT(SCH.SCHEDULE_ID) WHEN 1 THEN LOWER(SCH.SCHEDULE_TARGET_NAME) ELSE CONCAT(F_GET_SCH_TARGET_CNT(SCH.SCHEDULE_ID), ' Targets') END AS SCHEDULE_TARGET_NAME, 
+          		(SELECT DATATYPE_LABEL FROM PI_DATATYPES WHERE DATATYPE_ID = SCH.SCHEDULE_DATATYPE_PROFILES) AS DATATYPE_LABEL,
+          		SCH.SCHEDULE_DATATYPE_PROFILES,
+          		SCH.SCHEDULE_NEXT_SCAN, 
+		      	DATE_FORMAT(FROM_UNIXTIME(SCH.SCHEDULE_NEXT_SCAN), '%Y-%m-%d %h:%i:%s') AS SCHEDULE_NEXT_SCAN_DATE,
+            	CASE SCH.SCHEDULE_STATUS WHEN 'scheduled' THEN DATE_FORMAT(FROM_UNIXTIME(SCH.SCHEDULE_NEXT_SCAN), '%Y-%m-%d %h:%i:%s') 
+                                     	WHEN 'scanning' THEN DATE_FORMAT(FROM_UNIXTIME(SCH.SCHEDULE_NEXT_SCAN), '%Y-%m-%d %h:%i:%s') 
+                                     	WHEN 'paused' THEN DATE_FORMAT(FROM_UNIXTIME(SCH.SCHEDULE_NEXT_SCAN), '%Y-%m-%d %h:%i:%s') 
+                                     	ELSE '' END  AS SCHEDULE_NEXT_SCAN_DATE_STATUS,
+          		SCH.SCHEDULE_CPU, SCH.SCHEDULE_CAPTURE, SCH.SCHEDULE_TRACE, SCH.SCHEDULE_PAUSE_DAYS, 
+          		SCH.SCHEDULE_PAUSE_TO, SCH.SCHEDULE_PAUSE_FROM 
+     	  FROM PI_SCHEDULES SCH
+     	 WHERE 1 = 1
+     	   <if test="fromDate != null and fromDate != ''">
+     	   AND SCHEDULE_NEXT_SCAN BETWEEN UNIX_TIMESTAMP(CONCAT(#{fromDate},' 00:00:00')) AND UNIX_TIMESTAMP(CONCAT(#{toDate},' 23:59:59'))
+           </if>
+     	   <if test="searchType != null and searchType.size != 0">
+     	   AND SCH.SCHEDULE_STATUS IN
+     	    (
+     	    'scanning',
+			'pause',
+			'paused',
+     	     open="(" close=")"
+			<foreach collection="searchType" item="item" index="index" separator=",">
+				#{item}
+			</foreach>
+			)
+           </if>
+           <if test="hostName != null and hostName != ''">
+           AND SCH.SCHEDULE_ID IN (SELECT SCH_ID FROM PI_SCHEDULED_LOCATION WHERE TARGET_ID IN (SELECT TARGET_ID FROM PI_TARGETS WHERE NAME LIKE CONCAT('%', #{hostName}, '%')))
+           </if>
+		 ORDER BY SCHEDULE_NEXT_SCAN DESC, SCHEDULE_STATUS DESC, SCHEDULE_LABEL -->
+	</select>
+
+	<select id="selectSchedule" resultType="com.org.iopts.dto.Pi_ScheduleVO">
+		SELECT schedule_id,schedule_label,schedule_status,schedule_repeat_days,schedule_repeat_months,schedule_target_id,schedule_datatype_profiles,
+		schedule_next_scan, FROM_UNIXTIME(schedule_next_scan) AS schedule_next_datescan, schedule_target_name, schedule_cpu,schedule_capture, schedule_trace, schedule_pause_days, schedule_pause_to,
+		schedule_pause_from FROM pi_schedules WHERE schedule_status='scheduled' OR schedule_status=#{schedule_status} ORDER BY schedule_status='scheduled' DESC,schedule_label
+	</select>
+
+	<select id="selectScanHost" resultType="com.org.iopts.dto.Pi_Scan_HostVO">
+		SELECT T.target_id, T.name, L.location_id, L.description FROM pi_targets T, pi_locations L WHERE T.target_id = L.target_id ORDER BY
+		T.target_id,L.description
+	</select>
+
+	<select id="selectDataTypes" parameterType="hashmap" resultType="hashmap">
+		SELECT DATATYPE_ID, DATATYPE_LABEL, VERSION
+     	  FROM PI_DATATYPES
+     	 WHERE DATATYPE_ID IN 
+		<foreach collection="DATATYPE" item="item" index="index" open="(" close=")" separator=",">
+            #{item}
+        </foreach>
+	</select>
+
+	<update id="changeSchedule" parameterType="hashmap">
+		UPDATE PI_SCHEDULES
+		   SET SCHEDULE_STATUS = #{SCHEDULE_STATUS}
+     	 WHERE SCHEDULE_ID = #{SCHEDULE_ID}
+	</update>
+	
+	<select id="selectScheduleById" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+			 schedule_id, schedule_status, schedule_label, schedule_repeat_days, schedule_repeat_months 
+			,schedule_datatype_profiles, schedule_next_scan, schedule_target_id, schedule_target_name, schedule_cpu
+			,schedule_capture, schedule_trace, schedule_pause_days, schedule_pause_from, schedule_pause_to
+			,regdate
+		FROM PI_SCHEDULES
+     	WHERE SCHEDULE_ID = #{SCHEDULE_ID}
+     	  AND AP_NO = 0
+	</select>
+	
+	<select id="selectLocationList" parameterType="hashmap" resultType="hashmap">
+		<!-- SELECT A.GROUP_ID, A.TARGET_ID, A.LOCATION_ID, A.NAME, A.PATH, A.LEVEL
+		  FROM (
+		    SELECT A.GROUP_ID, A.TARGET_ID, '' AS LOCATION_ID, LOWER(A.NAME) AS NAME, LOWER(A.NAME) AS PATH, 1 AS LEVEL
+			    FROM PI_TARGETS A
+		      <if test='user_no != null and user_no != ""'>
+           		, PI_TARGET_USER B
+	             WHERE B.USER_NO = #{user_no}
+	               AND B.TARGET_ID = A.TARGET_ID
+	               AND A.TARGET_USE = 'Y'
+	          </if>
+	          <if test='user_no == null or user_no == ""'>
+	               WHERE A.TARGET_USE = 'Y'
+	          </if>
+		    UNION ALL
+		    SELECT A.GROUP_ID, A.TARGET_ID, A.LOCATION_ID, A.DESCRIPTION AS NAME, CONCAT(LOWER(B.NAME), '>', A.DESCRIPTION) AS PATH, 2 AS LEVEL
+		      FROM PI_LOCATIONS A, PI_TARGETS B
+           <if test='user_no != null and user_no != ""'>
+           		, PI_TARGET_USER U
+           </if>
+	         WHERE A.DESCRIPTION != 'All local process memory'
+	           AND A.DESCRIPTION != 'All local shadow volumes'
+               AND A.GROUP_ID = B.GROUP_ID
+               AND A.TARGET_ID = B.TARGET_ID
+               AND B.TARGET_USE = 'Y'
+           <if test='user_no != null and user_no != ""'>
+               AND U.USER_NO = #{user_no}
+               AND U.TARGET_ID = A.TARGET_ID
+           </if>
+		      ) A
+		 ORDER BY A.PATH, A.GROUP_ID, A.TARGET_ID, A.LOCATION_ID, LOWER(A.NAME) -->
+		 SELECT A.GROUP_ID, A.TARGET_ID, A.LOCATION_ID, A.NAME, A.PATH, A.LEVEL, A.AP_NO, A.DATATYPE_ID
+		  FROM (
+		    SELECT A.GROUP_ID, A.TARGET_ID, '' AS LOCATION_ID, LOWER(A.NAME) AS NAME, LOWER(A.NAME) AS PATH, 1 AS LEVEL, A.AP_NO AS AP_NO, A.DATATYPE_ID AS DATATYPE_ID
+			    FROM PI_TARGETS A
+		      <if test='user_no != null and user_no != ""'>
+           		, PI_TARGET_USER B
+	             WHERE B.USER_NO = #{user_no}
+	               AND B.TARGET_ID = A.TARGET_ID
+	               AND A.TARGET_USE = 'Y'
+	          </if>
+	          <if test='user_no == null or user_no == ""'>
+	               WHERE A.TARGET_USE = 'Y'
+	          </if>
+	          <if test='group_id != null and group_id != ""'>
+		          AND A.GROUP_IDX = #{group_id}
+	          </if>
+	          <if test='host != null and host != ""'>
+	               AND A.NAME REGEXP #{host}
+	           </if>
+	          <if test='noGroup == "Y"'>
+	               AND A.GROUP_IDX IS NULL
+	           </if>
+		    UNION ALL
+		    SELECT A.GROUP_ID, A.TARGET_ID, A.LOCATION_ID, A.DESCRIPTION AS NAME, CONCAT(LOWER(B.NAME), '>', A.DESCRIPTION) AS PATH, 2 AS LEVEL, B.AP_NO AS AP_NO, B.DATATYPE_ID AS DATATYPE_ID
+		      FROM PI_LOCATIONS A, PI_TARGETS B
+           <if test='user_no != null and user_no != ""'>
+           		, PI_TARGET_USER U
+           </if>
+	         WHERE A.DESCRIPTION != 'All local process memory'
+	           AND A.DESCRIPTION != 'All local shadow volumes'
+               AND A.GROUP_ID = B.GROUP_ID
+               AND A.TARGET_ID = B.TARGET_ID
+               AND B.TARGET_USE = 'Y'
+               <if test='group_id != null and group_id != ""'>
+		          AND B.GROUP_IDX = #{group_id}
+	          </if>
+	           <if test='user_no != null and user_no != ""'>
+	               AND U.USER_NO = #{user_no}
+	               AND U.TARGET_ID = A.TARGET_ID
+	           </if>
+	           <if test='host != null and host != ""'>
+	               AND B.NAME REGEXP #{host}
+	           </if>
+	           <if test='noGroup == "Y"'>
+	               AND B.GROUP_IDX IS NULL
+	           </if>
+		      ) A
+		 ORDER BY A.PATH, A.GROUP_ID, A.TARGET_ID, A.LOCATION_ID, LOWER(A.NAME)
+	</select>
+	
+	<select id="selectDatatypeList" parameterType="hashmap" resultType="hashmap">
+	    SELECT A.DATATYPE_LABEL, A.VERSION, @ROW := @ROW + 1 AS RNUM
+    	  FROM (
+				SELECT A.DATATYPE_LABEL, MAX(A.VERSION) AS VERSION
+		  		  FROM PI_DATATYPES A
+     			 GROUP BY A.DATATYPE_LABEL
+     			) A, (select @row := 0 AS ROW) B
+	</select>
+	
+	<select id="selectDatatypeVersion" parameterType="String" resultType="hashmap">
+     	SELECT DATATYPE_LABEL, VERSION, DATATYPE_ID
+       	  FROM PI_DATATYPES
+      	 WHERE DATATYPE_LABEL = #{value}
+      	 ORDER BY VERSION DESC
+	</select>	
+
+	<select id="viewScanHistory" parameterType="hashmap" resultType="hashmap">
+		SELECT H.TARGET_ID, H.URI, T.NAME, DATE_FORMAT(H.start_time, '%Y-%m-%d') as DATE, H.INACCESS
+		  FROM pi_scan_history H, pi_targets T
+		 WHERE H.target_id = T.target_id
+		   AND H.target_id = #{target_id}
+	</select>
+	<select id="viewScanPolicy" parameterType="hashmap" resultType="hashmap">
+		SELECT *, DATE_FORMAT(regdate, '%Y-%m-%d') AS DATE
+ 		  FROM pi_scan_policy
+ 		<if test="idx != null and idx != ''">
+ 		 WHERE idx = #{idx}
+ 		</if>
+	</select>
+
+	<insert id="registPolicy" parameterType="hashmap">
+		INSERT INTO pi_scan_policy (policy_name, policy_version, regdate, comment, datatype_id, schedule_label, schedule_pause_days,
+				schedule_pause_from, schedule_pause_to, schedule_cpu, schedule_data, schedule_memory, schedule_trace, dmz, default_check)
+		VALUES (#{policy_name}, #{policy_version}, NOW(), #{comment}, #{datatype}, #{schedule_label}, #{schedule_pause_days},
+		#{schedule_pause_from}, #{schedule_pause_to}, #{schedule_cpu}, #{schedule_data}, #{schedule_memory}, #{schedule_trace}, #{dmz}, #{check})
+	</insert>
+	
+	<update id="updatePolicy" parameterType="hashmap" >
+		UPDATE pi_scan_policy
+		   SET policy_name = #{policy_name}, 
+				 policy_version = #{policy_version}, 
+				 regdate = NOW(), 
+				 comment = #{comment}, 
+				 datatype_id = #{datatype}, 
+				 schedule_label = #{schedule_label}, 
+				 schedule_pause_days = #{schedule_pause_days},
+		 		 schedule_pause_from = #{schedule_pause_from},
+				 schedule_pause_to = #{schedule_pause_to},
+				 schedule_cpu = #{schedule_cpu},
+				 schedule_data = #{schedule_data},
+				 schedule_memory = #{schedule_memory},
+				 schedule_trace = #{schedule_trace},
+				 dmz = #{dmz}
+				 <!-- ,
+				 schledule_pause = #{pause} -->
+		 WHERE idx = #{idx}
+	</update>
+	
+	<update id="resetDefaultPolicy" parameterType="String">
+		UPDATE pi_scan_policy 
+		   SET default_check = '0'
+	</update>
+	
+	<update id="updateDefaultPolicy" parameterType="hashmap" >
+		UPDATE pi_scan_policy 
+	       SET default_check = '1'
+		 WHERE idx = #{idx};
+	</update>
+	
+	<select id="selectScheduleStatus" parameterType="String" resultType="String">
+     	SELECT SCHEDULE_STATUS FROM pi_schedules
+		WHERE SCHEDULE_ID = #{value}
+		  AND AP_NO = 0
+	</select>	
+	
+	<select id="selectScanSchedule" parameterType="String" resultType="hashmap">
+     	SELECT 
+     		SCHEDULE_ID, WEEKDAY, WORK_HOUR, WORK_CD, STOP_DTM
+       	FROM PI_SCAN_SCHEDULE
+      	WHERE 1=1
+      		AND SCHEDULE_GROUP_ID = #{value}
+      		AND ACTIVE_STATUS REGEXP '00|02'
+      	ORDER BY WEEKDAY ASC, WORK_HOUR ASC
+	</select>	
+	
+	<update id="changeActiveStatus" parameterType="hashmap" >
+		UPDATE PI_SCAN_SCHEDULE SET
+	        ACTIVE_STATUS = '01'
+	       ,UPT_USER_NO = #{userId}
+	       ,UPT_DTM = DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')
+		WHERE 1=1
+		 	AND SCHEDULE_ID = #{schedule_id}
+		 	AND ACTIVE_STATUS REGEXP '00|02'
+		 	<if test='isEmptyStop.equals("N")'>
+	 		AND WORK_CD != '03' 
+		 	</if>
+	</update>
+	
+	<update id="changeActiveStatus2" parameterType="hashmap" >
+		UPDATE PI_SCAN_SCHEDULE SET
+	        ACTIVE_STATUS = '01'
+	       ,UPT_USER_NO = #{userId}
+	       ,UPT_DTM = DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')
+		WHERE 1=1
+		 	AND SCHEDULE_GROUP_ID = #{schedule_id}
+		 	AND ACTIVE_STATUS REGEXP '00|02'
+		 	<if test='isEmptyStop.equals("N")'>
+	 		AND WORK_CD != '03' 
+		 	</if>
+	</update>
+	
+	<insert id="insertScanSchedule" parameterType="hashmap">
+		INSERT INTO PI_SCAN_SCHEDULE (
+			SCHEDULE_ID, ACTIVE_STATUS, WEEKDAY, WORK_HOUR, WORK_CD,
+			STOP_DTM, INS_USER_NO, INS_DTM, SCHEDULE_GROUP_ID
+		) VALUES (
+			#{schedule_id}, #{active}, #{weekday}, #{time}, #{work_cd}, 
+			#{stop_dtm}, #{userId}, DATE_FORMAT(NOW(), '%Y%m%d%H%i%s'), #{schedule_group}
+		)
+	</insert>
+	<select id="getConnectHistSeq" resultType="Integer">
+     	SELECT NEXT VALUE FOR pi_er2_connect_hist_seq FROM DUAL
+	</select>	
+	
+	<insert id="insConnectHist" parameterType="hashmap">
+		INSERT INTO PI_ER2_CONNECT_HIST (
+			ID, RECON_ID, URL, METHOD, REQ_DATA,
+			SND_DTM
+		) VALUES (
+			#{id}, #{recon_id}, #{url}, #{method}, #{req_data},  
+			DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')
+		)
+	</insert>
+	
+	<update id="uptConnectHist" parameterType="hashmap">
+		UPDATE PI_ER2_CONNECT_HIST SET
+			RSP_DTM = DATE_FORMAT(NOW(), '%Y%m%d%H%i%s'),
+			RSP_CD = #{rsp_cd},
+			RSP_MSG = #{rsp_msg}
+		WHERE 1=1
+			AND ID = #{id}
+			AND RECON_ID = #{recon_id}
+			AND URL = #{url}
+			AND METHOD = #{method}
+	</update>
+	
+	<update id="updateSchedule" parameterType="com.org.iopts.dto.Pi_ScheduleVO">
+		UPDATE PI_SCHEDULES SET
+			schedule_label=#{schedule_label},
+			schedule_status=#{schedule_status},
+			schedule_repeat_days=#{schedule_repeat_days},
+			schedule_repeat_months=#{schedule_repeat_months},
+			schedule_datatype_profiles=#{schedule_datatype_profiles},
+			schedule_cpu=#{schedule_cpu},
+			schedule_capture=#{schedule_capture},
+			schedule_target_id=#{schedule_target_id},
+			schedule_target_name=#{schedule_target_name},
+			schedule_trace=#{schedule_trace},
+			schedule_pause_days=#{schedule_pause_days},
+			schedule_pause_from=#{schedule_pause_from},
+			schedule_pause_to=#{schedule_pause_to},
+			regdate=now()
+		WHERE SCHEDULE_ID = #{schedule_id}
+	</update>
+	
+	<select id="getPolicyByIdx" parameterType="String" resultType="hashmap">
+		SELECT 
+			IDX, POLICY_NAME, POLICY_VERSION, REGDATE, COMMENT,
+			DATATYPE_ID, SCHEDULE_LABEL, SCHEDULE_PAUSE_DAYS, SCHEDULE_PAUSE_MONTH, SCHEDULE_PAUSE_FROM,
+			SCHEDULE_PAUSE_TO, SCHEDULE_CPU, SCHEDULE_DATA, SCHEDULE_MEMORY, SCHEDULE_TRACE,
+			DMZ, MANAGE, DEVELOP, DEFAULT_CHECK
+		FROM PI_SCAN_POLICY
+		WHERE 1=1
+			AND IDX = #{value}
+	</select>	
+	
+	<select id="getTargetName" parameterType="String" resultType="String">
+     	SELECT name FROM pi_targets
+		WHERE TARGET_ID = #{value}
+		limit 1
+	</select>	
+	
+	<update id="updateStatus" parameterType="hashmap">
+		UPDATE PI_SCHEDULES SET
+			schedule_status=#{status}
+		WHERE SCHEDULE_ID = #{id}
+	</update>
+	
+	<select id="selectGroupList" parameterType="String" resultType="hashmap">
+     	SELECT TG.NAME
+		, TG.IDX
+		, TG.UP_IDX
+		, FNC.LEVEL AS LEVEL
+		<if test='user_no != null and user_no != ""'>
+		, (SELECT COUNT(*) FROM pi_targets T LEFT OUTER JOIN  pi_target_user U on T.TARGET_ID = U.target_id WHERE TG.IDX = T.GROUP_IDX AND T.TARGET_USE = 'Y' AND U.USER_NO = #{user_no}) AS CNT
+	 	</if>
+	 	<if test='user_no == null or user_no == ""'>
+		, (SELECT COUNT(*) FROM pi_targets T LEFT OUTER JOIN  pi_target_user U on T.TARGET_ID = U.target_id WHERE TG.IDX = T.GROUP_IDX AND T.TARGET_USE = 'Y') AS CNT
+	 	</if>
+		, (
+			(SELECT COUNT(*) FROM pi_targets T, pi_target_user U WHERE T.TARGET_ID = U.target_id AND TG.IDX = T.GROUP_IDX AND T.TARGET_USE = 'Y') + 
+			(SELECT COUNT(*) FROM pi_target_group G WHERE G.UP_IDX = TG.IDX)
+		) AS BELOW
+		FROM 
+			(SELECT FNC_TARGET_GROUPING() AS ID, @LEVEL AS LEVEL
+				FROM (SELECT @start_with:=0, @id:=@start_with, @LEVEL:=0) vars
+				JOIN pi_target_group
+				WHERE @id IS NOT NULL) fnc
+				left outer JOIN pi_target_group TG ON FNC.ID = TG.IDX
+	</select>	
+	
+	<insert id="insertProfile" parameterType="hashmap">
+		INSERT INTO pi_datatypes_user (
+			DATATYPE_ID, 
+			DATATYPE_LABEL, 
+			CREATE_USER, 
+			RRN, RRN_CNT, 
+			FOREIGNER, FOREIGNER_CNT,
+		 	DRIVER, DRIVER_CNT, 
+		 	PASSPORT, PASSPORT_CNT, 
+		 	ACCOUNT, ACCOUNT_CNT, 
+		 	CARD, CARD_CNT, 
+		 	MOBILE_PHONE, MOBILE_PHONE_CNT, 
+		 	LOCAL_PHONE, LOCAL_PHONE_CNT,
+		 	OCR,
+		 	CAPTURE,
+		 	AP_NO
+		)
+		VALUES (
+			#{datatype_id}, 
+			#{datatype_label}, 
+			#{create_user},
+			<choose>
+				<when test="rrn != null and rrn != ''">1, #{rrn},</when>
+				<otherwise>0,0,</otherwise>
+			</choose>
+			<choose>
+				<when test="frn != null and frn != ''">1, #{frn},</when>
+				<otherwise>0,0,</otherwise>
+			</choose>
+			<choose>
+				<when test="dri != null and dri != ''">1, #{dri},</when>
+				<otherwise>0,0,</otherwise>
+			</choose>
+			<choose>
+				<when test="pas != null and pas != ''">1, #{pas},</when>
+				<otherwise>0,0,</otherwise>
+			</choose>
+			<choose>
+				<when test="acc != null and acc != ''">1, #{acc},</when>
+				<otherwise>0,0,</otherwise>
+			</choose>
+			<choose>
+				<when test="card != null and card != ''">1, #{card},</when>
+				<otherwise>0,0,</otherwise>
+			</choose>
+			<choose>
+				<when test="mob != null and mob != ''">1, #{mob},</when>
+				<otherwise>0,0,</otherwise>
+			</choose>
+			<choose>
+				<when test="local != null and local != ''">1, #{local},</when>
+				<otherwise>0,0,</otherwise>
+			</choose>
+			#{ocr},
+			#{capture},
+			#{ap_no}
+		)
+	</insert>
+	
+	<update id="updateProfile" parameterType="hashmap">
+		UPDATE pi_datatypes_user
+		SET
+			DATATYPE_ID = #{datatype_id},
+			DATATYPE_LABEL = #{datatype_label},
+			<choose>
+				<when test="rrn != null and rrn != ''">RRN=1, RRN_CNT=#{rrn},</when>
+				<otherwise>RRN=0, RRN_CNT=0,</otherwise>
+			</choose>
+			<choose>
+				<when test="frn != null and frn != ''">FOREIGNER=1, FOREIGNER_CNT=#{frn},</when>
+				<otherwise>FOREIGNER=0, FOREIGNER_CNT=0,</otherwise>
+			</choose>
+			<choose>
+				<when test="dri != null and dri != ''">DRIVER=1, DRIVER_CNT=#{dri},</when>
+				<otherwise>DRIVER=0, DRIVER_CNT=0,</otherwise>
+			</choose>
+			<choose>
+				<when test="pas != null and pas != ''">PASSPORT=1, PASSPORT_CNT=#{pas},</when>
+				<otherwise>PASSPORT=0, PASSPORT_CNT=0,</otherwise>
+			</choose>
+			<choose>
+				<when test="acc != null and acc != ''">ACCOUNT=1, ACCOUNT_CNT=#{acc},</when>
+				<otherwise>ACCOUNT=0, ACCOUNT_CNT=0,</otherwise>
+			</choose>
+			<choose>
+				<when test="card != null and card != ''">CARD=1, CARD_CNT=#{card},</when>
+				<otherwise>CARD=0, CARD_CNT=0,</otherwise>
+			</choose>
+			<choose>
+				<when test="mob != null and mob != ''">MOBILE_PHONE=1, MOBILE_PHONE_CNT=#{mob},</when>
+				<otherwise>MOBILE_PHONE=0, MOBILE_PHONE_CNT=0,</otherwise>
+			</choose>
+			<choose>
+				<when test="local != null and local != ''">LOCAL_PHONE=1, LOCAL_PHONE_CNT=#{local},</when>
+				<otherwise>LOCAL_PHONE=0, LOCAL_PHONE_CNT=0,</otherwise>
+			</choose>
+			OCR=#{ocr},
+			CAPTURE=#{capture}
+		WHERE 1 = 1
+		  AND DATATYPE_ID = #{now_datatype_id}
+	</update>
+	
+	<select id="getProfile" parameterType="hashmap" resultType="hashmap">
+     	SELECT DATATYPE_ID, 
+			DATATYPE_LABEL, 
+			CREATE_USER, 
+			RRN, RRN_CNT, 
+			FOREIGNER, FOREIGNER_CNT,
+		 	DRIVER, DRIVER_CNT, 
+		 	PASSPORT, PASSPORT_CNT, 
+		 	ACCOUNT, ACCOUNT_CNT, 
+		 	CARD, CARD_CNT, 
+		 	MOBILE_PHONE, MOBILE_PHONE_CNT, 
+		 	LOCAL_PHONE, LOCAL_PHONE_CNT,
+		 	OCR,
+		 	CAPTURE
+		FROM PI_DATATYPES_USER
+		WHERE 1=1
+		  AND ENABLE = 1
+		  <if test="datatype_id != null">
+		  	AND DATATYPE_ID = #{datatype_id}
+		  </if>
+	</select>
+	
+	<update id="deleteProfile" parameterType="hashmap">
+		UPDATE PI_DATATYPES_USER
+		   SET ENABLE = 0
+     	 WHERE DATATYPE_ID = #{DATATYPE_ID}
+	</update>
+	
+	<select id="selectDataTypeById" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+			  datatype_id, datatype_label, create_user, regdate, rrn
+			 ,foreigner, driver, passport, account, card
+			 ,phone, mobile_phone, local_phone, rrn_cnt, foreigner_cnt
+			 ,driver_cnt, passport_cnt, account_cnt, card_cnt, phone_cnt
+			 ,mobile_phone_cnt, local_phone_cnt, ocr, capture, enable
+		FROM PI_DATATYPES_USER
+     	WHERE DATATYPE_ID = #{DATATYPE_ID}
+	</select>
+	
+	<insert id="updateScanSchedule" parameterType="hashmap">
+		INSERT INTO pi_schedules
+		(
+			schedule_id,
+			schedule_status,
+			schedule_label,
+			schedule_repeat_days,
+			schedule_repeat_months,
+			schedule_datatype_profiles,
+			schedule_next_scan,
+			schedule_target_id,
+			schedule_target_name,
+			schedule_cpu,
+			schedule_capture,
+			schedule_trace,
+			<if test='pause_days != null and pause_days != ""'>
+			schedule_pause_days,
+		 	</if>
+		 	<if test='pause_from != null and pause_from != ""'>
+			schedule_pause_from,
+		 	</if>
+		 	<if test='pause_to != null and pause_to != ""'>
+			schedule_pause_to,
+		 	</if>
+			regdate
+		)
+		VALUES
+		(
+			#{id},
+			#{status},
+			#{label},
+			#{repeat_days},
+			#{repeat_months},
+			#{profiles},
+			#{next_scan},
+			#{target_id},
+			#{target_name},
+			#{cpu},
+			#{capture},
+			#{trace},
+			<if test='pause_days != null and pause_days != ""'>
+			#{pause_days},
+		 	</if>
+		 	<if test='pause_from != null and pause_from != ""'>
+			#{pause_from},
+		 	</if>
+		 	<if test='pause_to != null and pause_to != ""'>
+			#{pause_to},
+		 	</if>
+			now()
+		)
+		ON DUPLICATE KEY UPDATE
+		schedule_label=#{label},
+		schedule_status=#{status},
+		schedule_repeat_days=#{repeat_days},
+		schedule_repeat_months=#{repeat_months},
+		schedule_datatype_profiles=#{profiles},
+		schedule_cpu=#{cpu},
+		schedule_capture=#{capture},
+		schedule_target_id=#{target_id},
+		schedule_target_name=#{target_name},
+		schedule_trace=#{trace},
+		schedule_next_scan=#{next_scan},
+		<if test='pause_days != null and pause_days != ""'>
+		schedule_pause_days=#{pause_days},
+	 	</if>
+	 	<if test='pause_from != null and pause_from != ""'>
+		schedule_pause_from=#{pause_from},
+	 	</if>
+	 	<if test='pause_to != null and pause_to != ""'>
+		schedule_pause_to=#{pause_to},
+	 	</if>
+		regdate=now()
+	</insert>
+	
+	<select id="getApList" resultType="hashmap">
+		SELECT AP_NO, AP_NAME, AP_IP FROM SKT_AP_INFORMATION
+	</select>
+	
+	<select id="getPolicyByApno" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+		 datatype_label AS DATATYPE_LABEL, rrn AS RRN, foreigner AS FOREIGNER, driver AS DRIVER, passport AS PASSPORT
+		,ACCOUNT AS ACCOUNT, card AS CARD, phone AS PHONE, mobile_phone AS MOBILE_PHONE, local_phone AS LOCAL_PHONE
+		,rrn_cnt AS RRN_CNT, foreigner_cnt AS FOREIGNER_CNT, driver_cnt AS DRIVER_CNT, passport_cnt AS PASSPORT_CNT, account_cnt AS ACCOUNT_CNT
+		,card_cnt AS CARD_CNT, phone_cnt AS PHONE_CNT, mobile_phone_cnt AS MOBILE_PHONE_CNT, local_phone_cnt AS LOCAL_PHONE_CNT, ocr AS OCR
+		,capture AS CAPTURE, enable AS ENABLE
+	FROM pi_datatypes_user
+		WHERE AP_NO = #{ap_no}
+			AND ENABLE = 1
+	</select>
+	
+	<update id="disableProfile" parameterType="hashmap">
+		UPDATE pi_datatypes_user
+		SET
+			ENABLE = 0
+		WHERE 1 = 1
+		  AND AP_NO = #{ap_no}
+	</update>
+	
+	<update id="insertPolicyToTarget" parameterType="hashmap">
+		UPDATE PI_TARGETS
+		SET
+			DATATYPE_ID = #{datatype_id}
+		WHERE 1 = 1
+		  AND AP_NO = #{ap_no}
+		  AND TARGET_USE = 'Y'
+	</update>
+	
+	<select id="selectScheduleGroupTargets" parameterType="String" resultType="hashmap">
+		SELECT T.RECON_SCHEDULE_ID
+		FROM pi_schedule_targets T
+		WHERE T.AP_NO = 0
+		  AND T.SCHEDULE_GROUP_ID = #{value}
+	</select>
+	
+</mapper>

@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  
+<mapper namespace="com.org.iopts.popup.dao.PopupDAO">
+
+    <select id="selectGroupList" parameterType="hashmap" resultType="hashmap">
+<!--      	SELECT TG.NAME
+		, TG.IDX
+		, TG.UP_IDX
+		, FNC.LEVEL AS LEVEL
+		<if test='user_no != null and user_no != ""'>
+		, (SELECT COUNT(*) FROM pi_targets T LEFT OUTER JOIN  pi_target_user U on T.TARGET_ID = U.target_id WHERE TG.IDX = T.GROUP_IDX AND T.TARGET_USE = 'Y' AND U.USER_NO = #{user_no}) AS CNT
+	 	</if>
+	 	<if test='user_no == null or user_no == ""'>
+		, (SELECT COUNT(*) FROM pi_targets T LEFT OUTER JOIN  pi_target_user U on T.TARGET_ID = U.target_id WHERE TG.IDX = T.GROUP_IDX AND T.TARGET_USE = 'Y') AS CNT
+	 	</if>
+		, (
+			(SELECT COUNT(*) FROM pi_targets T, pi_target_user U WHERE T.TARGET_ID = U.target_id AND TG.IDX = T.GROUP_IDX AND T.TARGET_USE = 'Y') + 
+			(SELECT COUNT(*) FROM pi_target_group G WHERE G.UP_IDX = TG.IDX)
+		) AS BELOW
+		FROM 
+			(SELECT FNC_TARGET_GROUPING() AS ID, @LEVEL AS LEVEL
+				FROM (SELECT @start_with:=0, @id:=@start_with, @LEVEL:=0) vars
+				JOIN pi_target_group
+				WHERE @id IS NOT NULL) fnc
+				left outer JOIN pi_target_group TG ON FNC.ID = TG.IDX -->
+				
+		WITH RECURSIVE CTE AS (
+			SELECT 
+				2           			AS LEVEL,
+				G.INSA_CODE AS IDX,
+				CAST((CASE WHEN G.TYPE = 0 THEN 'sktoa' ELSE 'sktut' END) AS VARCHAR(500)) 	AS UP_IDX,
+				G.TEAM_NAME AS NAME,
+				(CASE WHEN G.TYPE = 3 THEN CONCAT(G.TEAM_NAME, '(Swing EAI)') WHEN G.INSA_CODE = '00009999' THEN CONCAT(G.TEAM_NAME, '(Swing ILM)') ELSE G.TEAM_NAME END)		AS FULLNAME,
+				<!-- G.TEAM_NAME 						AS FULLNAME, -->
+				CAST(G.INSA_CODE AS VARCHAR(500)) 	AS FULLID,
+				CAST('' AS VARCHAR(500)) AS TARGET_ID,
+				CAST('' AS VARCHAR(500)) AS TARGET_NAME
+			FROM pi_group G
+			WHERE G.UP_IDX = ''
+			  AND G.TEAM_NAME != ''
+		UNION ALL
+			SELECT 
+				CTE.LEVEL + 1 AS LEVEL,
+				TG.INSA_CODE AS IDX,
+				TG.UP_IDX,
+				TG.TEAM_NAME AS NAME,
+				CONCAT(CTE.FULLNAME, '>', TG.TEAM_NAME) AS FULLNAME,
+				CONCAT(CTE.FULLID, '-', TG.INSA_CODE) AS FULLID,
+				'' AS TARGET_ID,
+				'' AS TARGET_NAME
+			FROM pi_group TG, CTE
+			WHERE TG.UP_IDX != ''
+			  AND TG.UP_IDX = CTE.IDX
+		) 
+		SELECT CTE.NAME, 
+		CTE.IDX, 
+		CTE.UP_IDX, 
+		CTE.LEVEL, 
+		CASE WHEN CTE.TARGET_ID != '' THEN 1  ELSE COUNT(T.TARGET_ID) END AS CNT,
+		(COUNT(T.TARGET_ID) + (SELECT COUNT(*) FROM pi_target_group G WHERE CTE.IDX = G.UP_IDX)) AS BELOW,
+		CTE.FULLNAME, 
+		CTE.FULLID AS FULLID,
+		CTE.TARGET_ID,
+		CTE.TARGET_NAME
+		FROM CTE LEFT OUTER JOIN pi_targets T ON CTE.IDX = T.GROUP_IDX AND T.TARGET_USE = 'Y' AND T.TARGET_ID IS NOT NULL
+		GROUP BY CTE.FULLID
+		ORDER BY CTE.FULLNAME
+	</select>	
+
+    <select id="getTargetList" parameterType="String" resultType="hashmap">
+     	SELECT DISTINCT H.*
+		  FROM (
+				SELECT '0' AS CHK, 
+						T.TARGET_ID,
+						T.NAME AS AGENT_NAME,
+						IF (
+							PLATFORM = 'Remote Access Only',
+							'1',
+							EXPORT_SET(A.AGENT_CONNECTED,'1','0','',1)
+						) AS AGENT_CONNECTED,
+						#A.AGENT_CONNECTED,
+						A.AGENT_VERSION,
+						A.AGENT_PLATFORM,
+						A.AGENT_PLATFORM_COMPATIBILITY,
+						EXPORT_SET(A.AGENT_VERIFIED,'1','0','',1) AS AGENT_VERIFIED,
+						A.AGENT_USER,
+						A.AGENT_CPU,
+						A.AGENT_CORES,
+						A.AGENT_BOOT,
+						A.AGENT_RAM,
+						A.AGENT_STARTED,
+						A.AGENT_CONNECTED_IP, 
+						T.SEARCH_TIME, 
+						<!-- DATE_FORMAT(FROM_UNIXTIME(t.search_time), '%Y-%m-%d %h:%i:%s' ) as SEARCH_DATETIME, --> 
+						CONCAT(
+							DATE_FORMAT(FROM_UNIXTIME(t.search_time), '%Y-%m-%d %h:%i:%s' ),
+							IF(
+								ISNULL(T.DURATION),
+								'',
+								IF (
+									T.DURATION = NULL,
+									'0초',
+									IF(
+										T.DURATION > 86400,
+										CONCAT('(', T.DURATION / 86400, '일)'),
+										IF(
+											T.DURATION > 3600,
+											CONCAT('(', T.DURATION / 3600, '시간)'),
+											IF(
+												T.DURATION > 60,
+												CONCAT('(', T.DURATION / 60, '분)'),
+												CONCAT('(', T.DURATION, '초)')
+											)
+										) 
+									)
+								) 
+							)
+						) as SEARCH_DATETIME,
+						CONCAT(
+							IF(
+								ISNULL(T.ALL_SCAN_DATE),
+								'미검색',
+								T.ALL_SCAN_DATE
+							),
+							IF(
+								ISNULL(T.ALL_DURATION),
+								'',
+								IF(
+									T.ALL_DURATION > 86400,
+									CONCAT('(', T.ALL_DURATION / 86400, '일)'),
+									IF(
+										T.ALL_DURATION > 3600,
+										CONCAT('(', T.ALL_DURATION / 3600, '시간)'),
+										IF(
+											T.ALL_DURATION > 60,
+											CONCAT('(', T.ALL_DURATION / 60, '분)'),
+											CONCAT('(', T.ALL_DURATION, '초)')
+										)
+									) 
+								)
+							)
+						) as ALL_SCAN_DATE,
+						DATE_FORMAT(t.regdate, '%Y-%m-%d %h:%i:%s' ) as REGDATE,
+						T.AP_NO										AS AP_NO,
+						IFNULL((SELECT COUNT(*) FROM PI_FIND F WHERE F.GROUP_ID = T.GROUP_ID AND F.TARGET_ID = T.TARGET_ID),0) AS FIND_CNT,
+						L.LOCATION_ID	AS LOCATION_ID
+				  FROM PI_TARGETS T
+				       LEFT OUTER JOIN PI_AGENTS A ON T.NAME = A.AGENT_NAME AND T.AP_NO = A.AP_NO AND A.AGENT_USE = 'Y'
+				       LEFT OUTER JOIN PI_LOCATIONS L ON T.TARGET_ID = L.TARGET_ID AND (L.DESCRIPTION REGEXP 'Catalog|All local files')
+					 	<if test="user_no != null and user_no != ''">
+							, PI_TARGET_USER U
+					 	</if>
+				 WHERE 1 = 1
+				 	<if test="user_no != null and user_no != ''">
+						AND T.TARGET_ID = U.TARGET_ID
+						AND U.USER_NO = #{user_no}
+				 	</if>
+				 	AND T.TARGET_USE = 'Y'
+				 	<if test="group_id != null and group_id != ''">
+						AND T.GROUP_IDX = #{group_id}
+				 	</if>
+				 	<if test='noGroup  == "Y"'>
+						AND T.GROUP_IDX IS NULL
+						AND T.AP_NO = 0
+				 	</if>
+				 	<if test='noGroup  == "P"'>
+						AND NOT T.AP_NO = 0
+				 	</if>
+				 	<if test="host != null and host != ''">
+						AND T.NAME REGEXP #{host}
+				 	</if>
+					
+			) H
+		ORDER BY H.AGENT_NAME
+	</select>	
+	
+	<select id="getUserTargetList" parameterType="String" resultType="hashmap">
+     	SELECT DISTINCT H.*
+		  FROM (
+				SELECT '0' AS CHK, 
+						T.TARGET_ID,
+						<!-- T.NAME AS AGENT_NAME, -->
+						<choose>
+							<when test="groupID != null and groupID != ''">
+								CONCAT(U.USER_NAME,CASE WHEN U.SOSOK IS NULL OR U.SOSOK != '' THEN '' ELSE CONCAT('/',U.SOSOK) END) AS AGENT_NAME,
+							</when>
+							<otherwise>
+								T.NAME AS AGENT_NAME,
+							</otherwise>
+						</choose>
+						IF (
+							PLATFORM = 'Remote Access Only',
+							'1',
+							EXPORT_SET(A.AGENT_CONNECTED,'1','0','',1)
+						) AS AGENT_CONNECTED,
+						#A.AGENT_CONNECTED,
+						A.AGENT_VERSION,
+						A.AGENT_PLATFORM,
+						A.AGENT_PLATFORM_COMPATIBILITY,
+						EXPORT_SET(A.AGENT_VERIFIED,'1','0','',1) AS AGENT_VERIFIED,
+						A.AGENT_USER,
+						A.AGENT_CPU,
+						A.AGENT_CORES,
+						A.AGENT_BOOT,
+						A.AGENT_RAM,
+						A.AGENT_STARTED,
+						A.AGENT_CONNECTED_IP, 
+						T.SEARCH_TIME, 
+						CONCAT(
+							DATE_FORMAT(FROM_UNIXTIME(t.search_time), '%Y-%m-%d %h:%i:%s' ),
+							IF(
+								ISNULL(T.DURATION),
+								'',
+								IF (
+									T.DURATION = NULL,
+									'0초',
+									IF(
+										T.DURATION > 86400,
+										CONCAT('(', T.DURATION / 86400, '일)'),
+										IF(
+											T.DURATION > 3600,
+											CONCAT('(', T.DURATION / 3600, '시간)'),
+											IF(
+												T.DURATION > 60,
+												CONCAT('(', T.DURATION / 60, '분)'),
+												CONCAT('(', T.DURATION, '초)')
+											)
+										) 
+									)
+								) 
+							)
+						) as SEARCH_DATETIME,
+						CONCAT(
+							IF(
+								ISNULL(T.ALL_SCAN_DATE),
+								'미검색',
+								T.ALL_SCAN_DATE
+							),
+							IF(
+								ISNULL(T.ALL_DURATION),
+								'',
+								IF(
+									T.ALL_DURATION > 86400,
+									CONCAT('(', T.ALL_DURATION / 86400, '일)'),
+									IF(
+										T.ALL_DURATION > 3600,
+										CONCAT('(', T.ALL_DURATION / 3600, '시간)'),
+										IF(
+											T.ALL_DURATION > 60,
+											CONCAT('(', T.ALL_DURATION / 60, '분)'),
+											CONCAT('(', T.ALL_DURATION, '초)')
+										)
+									) 
+								)
+							)
+						) as ALL_SCAN_DATE,
+						DATE_FORMAT(t.regdate, '%Y-%m-%d %h:%i:%s' ) as REGDATE,
+						T.AP_NO										AS AP_NO,
+						IFNULL((SELECT COUNT(*) FROM PI_FIND F WHERE F.GROUP_ID = T.GROUP_ID AND F.TARGET_ID = T.TARGET_ID),0) AS FIND_CNT
+				FROM
+					PI_TARGETS T
+				    LEFT OUTER JOIN PI_AGENTS A ON T.NAME = A.AGENT_NAME AND T.AP_NO = A.AP_NO AND A.AGENT_USE = 'Y'
+				     <choose>
+						<when test="groupID != null and groupID != ''">
+							,pi_user U, PI_TARGET_USER TU
+						</when>
+						<otherwise>
+							LEFT OUTER JOIN pi_target_user TU ON T.AP_NO = TU.AP_NO AND T.TARGET_ID = TU.TARGET_ID
+						</otherwise>
+					</choose>
+				WHERE 1 = 1
+					AND T.AP_NO != 0
+					AND T.TARGET_USE = 'Y'
+					<choose>
+						<when test="groupID != null and groupID != ''">
+							AND T.TARGET_ID = TU.TARGET_ID
+					 		AND U.USER_NO = TU.USER_NO
+					 		AND U.INSA_CODE=#{groupID}
+						</when>
+						<otherwise>
+						   AND TU.USER_NO IS NULL
+						</otherwise>
+					</choose>
+			) H
+		ORDER BY H.AGENT_NAME
+	</select>	
+	
+	<!-- 공지사항 상세보기 -->
+	<select id="noticeDetail" parameterType="int" resultType="hashmap">
+		SELECT NOTICE_ID AS IDX, NF.NOTICE_FILE_ID, NF.FILE_NAME, NF.REAL_FILE_NAME, 
+			CASE WHEN NF.NOTICE_FILE_ID IS NULL THEN 0 ELSE 1 END AS FILE_CHK,
+			N.USER_NO, NOTICE_TITLE, NOTICE_CON, NOTICE_CHK,
+			DATE_FORMAT(N.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, U.USER_NAME
+		FROM PI_NOTICE N
+			LEFT OUTER JOIN PI_NOTICE_FILE NF ON N.NOTICE_FILE_ID = NF.NOTICE_FILE_ID
+			,pi_user U  
+		WHERE N.USER_NO = U.USER_NO
+		  AND NOTICE_ID = #{id} 
+		ORDER BY IDX DESC
+	</select>
+    
+	<!-- faq 상세보기 -->
+	<select id="faqDetail" parameterType="int" resultType="hashmap">
+		SELECT FAQ_NO, FAQ_TITLE, FAQ_CONTENT, DATE_FORMAT(FAQ_CREATE_DT, '%Y-%m-%d %H:%i:%s') AS FAQ_CREATE_DT, 
+		   FAQ_STATUS, IFNULL(FAQ_USER_SOSOK, '없음') AS FAQ_USER_SOSOK, USER_NO, USER_NAME
+		FROM pi_faq
+		JOIN pi_user USING(USER_NO)
+		WHERE FAQ_NO = #{id} 
+		ORDER BY FAQ_CREATE_DT DESC
+	</select>
+	
+	<select id="downloadDetail" parameterType="int" resultType="hashmap">
+		SELECT DOWNLOAD_ID AS IDX, DF.DOWNLOAD_FILE_ID, DF.FILE_NAME, DF.REAL_FILE_NAME, 
+			CASE WHEN DF.DOWNLOAD_FILE_ID IS NULL THEN 0 ELSE 1 END AS FILE_CHK,
+			D.USER_NO, DOWNLOAD_TITLE, DOWNLOAD_CON,
+			DATE_FORMAT(D.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, U.USER_NAME
+		FROM PI_DOWNLOAD D
+			LEFT OUTER JOIN PI_DOWNLOAD_FILE DF ON D.DOWNLOAD_FILE_ID = DF.DOWNLOAD_FILE_ID
+			,pi_user U  
+		WHERE D.USER_NO = U.USER_NO
+		  AND DOWNLOAD_ID = #{id}
+		ORDER BY IDX DESC
+	</select>
+	
+	<select id="selectUserList" parameterType="hashmap" resultType="hashmap">
+     	SELECT U.USER_NO, U.USER_NAME, U.USER_PHONE, G.INSA_CODE, G.TEAM_NAME, U.USER_EMAIL, U.USER_GRADE
+		FROM pi_user U
+			LEFT OUTER JOIN pi_group G ON U.INSA_CODE = G.INSA_CODE
+		WHERE 1 = 1
+		  <if test='userNm != "" and userNm != null'>
+		  AND U.USER_NAME LIKE CONCAT('%', #{userNm},'%') 
+		  </if>
+		  <if test="teamNm != null and teamNm != ''">
+		  AND G.TEAM_NAME LIKE CONCAT('%',#{teamNm},'%') 
+		  </if>
+	</select>
+	
+	<insert id="updateTargetUser" parameterType="hashmap">
+		INSERT INTO PI_TARGET_USER (USER_NO, TARGET_ID, AP_NO, SERVICE_CODE, SERVICE_NM, SERVICE_MNGR2, SERVICE_MNGR3, SERVICE_MNGR4, SERVICE_MNGR5, REGDATE)
+			VALUES (#{mngr1_no}, #{target_id}, #{ap_no}, '', '', #{mngr2_no}, #{mngr3_no}, #{mngr4_no}, #{mngr5_no}, NOW())
+		ON DUPLICATE KEY UPDATE
+			USER_NO =  #{mngr1_no},
+			SERVICE_MNGR2 = #{mngr2_no},
+			SERVICE_MNGR3 = #{mngr3_no},
+			SERVICE_MNGR4 = #{mngr4_no},
+			SERVICE_MNGR5 = #{mngr5_no},
+			REGDATE = NOW()
+	</insert>
+	
+	<insert id="updateTargetUserlog" parameterType="hashmap">
+		INSERT INTO pi_target_user_log (TARGET_ID, AP_NO, TYPE, NAME, USER_NO, USER_NM, UPDATE_USER_NO, UPDATE_USER_NM, REGDATE) 
+		VALUES (#{target_id}, #{ap_no}, #{type}, #{name}, #{user_no}, #{user_name}, #{update_user_no}, #{update_user_name}, DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00'))
+		ON DUPLICATE KEY UPDATE
+			USER_NO = #{user_no},
+			USER_NM = #{user_name},
+			UPDATE_USER_NO = #{update_user_no},
+			UPDATE_USER_NM = #{update_user_name},
+			REGDATE = DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00')
+	</insert>
+	
+	<insert id="updatePCTargetUser" parameterType="hashmap">
+		INSERT INTO pi_target_user (USER_NO, TARGET_ID, AP_NO, SERVICE_CODE, SERVICE_NM, SERVICE_USER, INFRA_MANAGER, REGDATE) 
+		VALUES (#{user_no}, #{target_id}, #{ap_no}, '', '', #{service_user_no}, '', NOW())
+		ON DUPLICATE KEY UPDATE
+			USER_NO =  #{user_no},
+			SERVICE_USER = #{service_user_no},
+			REGDATE = NOW()
+	</insert>
+	
+	<update id="updateUserGrade" parameterType="hashmap">
+		UPDATE pi_user SET 
+			USER_GRADE = #{user_grade}
+		WHERE 1=1
+			AND USER_NO = #{update_user_no}
+			AND USER_NAME = #{update_user_name}
+			AND USER_GRADE &lt; #{user_grade}
+	</update>
+	
+	<select id="selectNetPolicy" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+			SP.IDX,
+			SP.POLICY_NAME,
+			SP.STD_ID,
+			DU.DATATYPE_LABEL,
+			DU.RRN, DU.RRN_CNT, DU.RRN_DUP,
+			DU.FOREIGNER, DU.FOREIGNER_CNT, DU.FOREIGNER_DUP,
+		 	DU.DRIVER, DU.DRIVER_CNT, DU.DRIVER_DUP,
+		 	DU.PASSPORT, DU.PASSPORT_CNT, DU.PASSPORT_DUP,
+		 	DU.ACCOUNT, DU.ACCOUNT_CNT, DU.ACCOUNT_DUP,
+		 	DU.CARD, DU.CARD_CNT, DU.CARD_DUP,
+		 	DU.MOBILE_PHONE, DU.MOBILE_PHONE_CNT, DU.MOBILE_PHONE_DUP, 
+		 	DU.LOCAL_PHONE, DU.LOCAL_PHONE_CNT, DU.LOCAL_PHONE_DUP,
+		 	DU.EMAIL, DU.EMAIL_CNT, DU.EMAIL_DUP,
+		 	DU.OCR, DU.RECENT,
+		 	DU.CAPTURE,
+			SP.ACTION
+		FROM pi_scan_policy SP, pi_datatypes_user DU
+		WHERE 1 = 1
+		  AND SP.ENABLE = 1
+		  AND SP.POLICY_TYPE = 2
+		  AND SP.STD_ID = DU.STD_ID
+		  <if test="policyNm != null and policyNm != ''">
+		  	AND SP.POLICY_NAME LIKE CONCAT('%', #{policyNm} ,'%')
+		  </if>
+		GROUP BY SP.IDX
+		ORDER BY POLICY_NAME
+	</select>
+	
+	
+</mapper>

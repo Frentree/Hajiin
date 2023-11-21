@@ -1,0 +1,54 @@
+@charset "utf-8";
+/******************************************************
+    Font
+******************************************************/
+/* 챘�싈쑦ニ녳�씳ぢ냈졗モ�앪�� */
+@font-face {
+    font-family: 'KBFGDisplay';
+    src: url('../fonts/NanumGothic-Bold.eot');
+    src: url('../fonts/NanumGothic-Bold.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/NanumGothic-Bold.woff') format('woff');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'KBFGDisplay';
+    src: url('../fonts/NanumGothic-Regular.eot');
+    src: url('../fonts/NanumGothic-Regular.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/NanumGothic-Regular.woff') format('woff');
+    font-weight: normal;
+}
+@font-face {
+  font-family: 'S-CoreDream-6Bold';
+  font-style: normal;
+  font-weight: 500;
+  src: url(../fonts/SCDream6.otf);
+}
+
+@font-face {
+  font-family: 'S-CoreDream-5Medium';
+  font-style: normal;
+  font-weight: 300;
+  src: url(../fonts/SCDream5.otf);
+}
+
+@font-face {
+  font-family: 'S-CoreDream-6Bold';
+  font-style: normal;
+  font-weight: 500;
+  src: url(../fonts/SCDream6.woff);
+}
+
+@font-face {
+  font-family: 'S-CoreDream-5Medium';
+  font-style: normal;
+  font-weight: 300;
+  src: url(../fonts/SCDream5.woff);
+}
+@font-face {
+  font-family: 'NotoSansR';
+  font-style: noraml;
+  font-weight: 300;
+  src: url(../fonts/NotoSansKR-Medium.otf);
+}
+
+

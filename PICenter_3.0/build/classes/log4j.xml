@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+  <Appenders>
+    <Console name="CONSOLE" target="SYSTEM_OUT">
+      <PatternLayout pattern="%-5p: %c - %m%n"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Logger name="org.apache.log4j.xml" level="info"/>
+    
+    <Logger name="com.org.iopts" level="info"/>
+    <Logger name="org.springframework.core" level="info"/>
+    <Logger name="org.springframework.beans" level="info"/>
+    <Logger name="org.springframework.context" level="info"/>
+    <Logger name="org.springframework.web" level="info"/>
+    
+    <Root level="info">
+      <AppenderRef ref="console"/>
+    </Root>
+  </Loggers>
+</Configuration>

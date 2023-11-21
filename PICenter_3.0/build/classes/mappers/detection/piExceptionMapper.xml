@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.detection.dao.piExceptionDAO">
+
+    <select id="selectExceptionList" parameterType="hashmap" resultType="hashmap">
+        SELECT PEG.IDX, 
+               T.NAME AS OWNER, 
+               PEG.PATH_EX_GROUP_ID AS RESCAN, 
+               PEG.PATH_EX_CHARGE_ID AS CHARGE_ID, 
+               PEG.PATH_EX_GROUP_NAME AS FILENAME, 
+               DATE_FORMAT(PEG.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+               DATE_FORMAT(PEG.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE, 
+               PEG.APPROVAL_STATUS, 
+               PEG.NOTE, 
+               PEG.USER_NO, 
+               (select path_ex_flag_name from pi_path_exception_flag WHERE path_ex_flag = PEG.path_ex_flag) FLAG_NAME,
+               PEG.OK_USER_NO
+          FROM PI_PATH_EXCEPTION_GROUP AS PEG
+              ,PI_TARGETS AS T
+         WHERE T.TARGET_ID = PEG.TARGET_ID
+           AND PEG.USER_NO = (#{user_no})
+           AND DATE_FORMAT(PEG.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test='owner != null and owner != ""'>
+           AND T.NAME LIKE CONCAT('%',#{owner},'%')
+       </if>
+        <if test='filename != null and filename != ""'>
+           AND PEG.path_ex_group_name LIKE CONCAT('%',#{filename},'%')
+       </if>
+
+        <choose>
+            <when test='status != null and status != "" and status == "NR"'>
+                AND (PEG.APPROVAL_STATUS IS NULL OR PEG.APPROVAL_STATUS = '')
+            </when>
+            <otherwise>
+                <if test='status != null and status != ""'>
+                    AND PEG.APPROVAL_STATUS = #{status}
+                </if>
+            </otherwise>
+        </choose>
+
+         ORDER BY PEG.REGDATE DESC, PEG.OKDATE DESC, IDX
+    </select>
+
+    <select id="selectExeptionPath" parameterType="hashmap" resultType="hashmap">
+        SELECT PPE.path_ex,
+               PEG.USER_NO,
+               PEG.path_ex_group_id AS CHARGE_ID
+          FROM PI_PATH_EXCEPTION_GROUP AS PEG
+              ,pi_path_exception AS PPE
+         WHERE PPE.path_exception_group_idx = PEG.idx
+           AND PEG.USER_NO = (#{user_no})
+           AND PEG.idx = #{path_ex_group_id};
+    </select>
+
+    <select id="selectDocuNum" parameterType="hashmap" resultType="hashmap">
+        SELECT IFNULL(COUNT(*), 0) + 1 AS SEQ
+          FROM PI_PATH_EXCEPTION_CHARGE
+         WHERE USER_NO = #{user_no}
+           AND DATE_FORMAT(REGDATE,'%Y%m%d') = #{today}
+    </select>
+
+    <insert id="registPathExceptionCharge" parameterType="hashmap" useGeneratedKeys="true" keyProperty="path_ex_charge_id">
+        <selectKey resultType="Int" keyProperty="path_ex_charge_id" order="BEFORE" >
+            SELECT IFNULL(COUNT(*), 0) + 1 AS SEQ
+              FROM PI_PATH_EXCEPTION_CHARGE
+        </selectKey>
+
+        INSERT INTO PI_PATH_EXCEPTION_CHARGE (
+            path_ex_charge_name, 
+            user_no, 
+            ok_user_no, 
+            status, 
+            REGDATE, 
+            OKDATE, 
+            REASON, 
+            RETURN_REASON, 
+            PATH_EX_CHARGE_ID
+        ) 
+        VALUES (
+            CONCAT(#{today}, "_" , #{user_no}, "_" , #{doc_seq}),
+            #{user_no}, 
+            #{ok_user_no}, 
+            #{apprType}, 
+            NOW(), 
+            NULL, 
+            #{comment}, 
+            NULL, 
+            #{path_ex_charge_id}
+        )
+    </insert>
+
+    <update id="updateExceptionGroupStatus">
+        UPDATE PI_PATH_EXCEPTION_GROUP PEG
+           SET PEG.OK_USER_NO = #{ok_user_no},
+               PEG.OKDATE = NOW(),
+               PEG.APPROVAL_STATUS = #{apprType},
+               PEG.path_ex_charge_id = #{path_ex_charge_id},
+               PEG.NOTE = #{comment}
+         WHERE PEG.USER_NO = #{user_no}
+           AND PEG.IDX = #{idx}
+    </update>
+
+    <select id="exceptionApprovalListData" parameterType="hashmap" resultType="hashmap">
+        SELECT IDX, 
+               path_ex_charge_id AS CHARGE_ID, 
+               path_ex_charge_name AS NAME, 
+               PEC.USER_NO, 
+               PU.USER_NAME,
+               PEC.OK_USER_NO, 
+               (SELECT Z.USER_NAME FROM PI_USER Z WHERE Z.USER_NO = PEC.ok_user_no) AS OK_USER_NAME, 
+               DATE_FORMAT(PEC.REGDATE, '%Y-%m-%d %H:%i:%s') AS REGDATE, 
+               DATE_FORMAT(PEC.OKDATE, '%Y-%m-%d %H:%i:%s') AS OKDATE,
+               PEC.STATUS, 
+               PEC.REASON
+          FROM PI_PATH_EXCEPTION_CHARGE AS PEC
+               LEFT OUTER JOIN PI_USER AS PU
+                 ON PU.USER_NO = PEC.USER_NO
+         WHERE 1=1
+
+        <if test='status != null and status != ""'>
+           AND PEC.STATUS = #{status}
+        </if>
+           AND DATE_FORMAT(PEC.REGDATE, '%Y-%m-%d') BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test='user_nm != null and user_nm != ""'>
+           AND PU.USER_NAME LIKE CONCAT('%',#{user_nm},'%')
+       </if>
+        <if test='path != null and path != ""'>
+           AND PEC.path_ex_charge_name LIKE CONCAT('%',#{path},'%')
+       </if>
+
+        <choose>
+            <when test='user_grade != 0'>
+                AND (PEC.USER_NO = #{user_no} OR PEC.OK_USER_NO = #{user_no})
+            </when>
+            <otherwise>
+                AND PEC.USER_NO = #{user_no}
+            </otherwise>
+        </choose>
+         ORDER BY PEC.REGDATE DESC, PEC.OKDATE DESC
+    </select>
+
+    <select id="exceptionApprovalAllListData" parameterType="hashmap" resultType="hashmap">
+        SELECT PE.path_ex_scope,
+               PE.path_ex,
+               PEG.idx AS group_id,
+               PEC.idx AS charge_id,
+               PEC.path_ex_charge_name AS charge_name
+          FROM PI_PATH_EXCEPTION_CHARGE PEC
+              ,PI_PATH_EXCEPTION_GROUP PEG
+              ,PI_PATH_EXCEPTION PE
+         WHERE 1=1
+           AND PEC.IDX = PEG.PATH_EX_CHARGE_ID
+           AND PEG.IDX = PE.PATH_EXCEPTION_GROUP_IDX
+           AND PEG.OK_USER_NO = #{user_no}
+           AND PEC.STATUS = 'W'
+    </select>
+
+    <select id="selectExceptionGroupPath" parameterType="hashmap" resultType="hashmap">
+        SELECT PE.path_ex_scope,
+               PE.path_ex,
+               PE.path_exception_group_idx as group_id,
+               PE.target_id,
+               PEG.user_no
+          FROM PI_PATH_EXCEPTION_CHARGE PEC
+              ,PI_PATH_EXCEPTION_GROUP PEG
+              ,PI_PATH_EXCEPTION PE
+         WHERE 1=1
+           AND PEC.PATH_EX_CHARGE_ID = PEG.PATH_EX_CHARGE_ID
+           AND PEG.IDX = PE.PATH_EXCEPTION_GROUP_IDX
+           AND PEC.PATH_EX_CHARGE_ID in 
+        <foreach item="charge_id_list" index="index" collection="charge_id_list" open="(" separator="," close=")">
+                #{charge_id_list}
+        </foreach>
+    </select>
+
+    <update id="updateExceptionApproval" parameterType="hashmap">
+        UPDATE PI_PATH_EXCEPTION_CHARGE DPC, PI_PATH_EXCEPTION_GROUP DPG 
+           SET DPC.OK_USER_NO = #{user_no},
+               DPC.OKDATE = NOW(),
+               DPC.STATUS = #{apprType},
+               DPG.APPROVAL_STATUS = #{apprType},
+            <if test='apprType == "D"'>
+               DPC.RETURN_REASON = #{reason},
+               DPG.RETURN_REASON = #{reason}
+            </if>
+            <if test='apprType == "E"'>
+               DPC.REASON = #{reason},
+               DPG.REASON = #{reason}
+            </if>
+         WHERE DPC.PATH_EX_CHARGE_ID = #{chargeIdList}
+           AND DPG.PATH_EX_CHARGE_ID = #{chargeIdList}
+    </update>
+    
+    <update id="updateExceptionChange" parameterType="hashmap">
+        UPDATE PI_FIND F
+           SET F.OWNER = #{ex_user_no}
+         WHERE F.OWNER = #{user_no}
+           AND F.PATH LIKE CONCAT(#{path}, '%')
+           AND F.TARGET_ID = #{target_id}
+    </update>
+    
+    <select id="selectReScanTarget" parameterType="hashmap" resultType="hashmap">
+        SELECT PEG.IDX, 
+               PE.TARGET_ID,
+			   PE.PATH_EX AS PATH,
+		       L.LOCATION_ID,
+		       PEG.PATH_EX_GROUP_ID AS RESCAN
+          FROM PI_PATH_EXCEPTION_GROUP AS PEG
+              ,PI_PATH_EXCEPTION AS PE
+              ,PI_TARGETS T
+              ,PI_LOCATIONS L
+         WHERE 1=1
+           AND PEG.IDX = PE.PATH_EXCEPTION_GROUP_IDX
+           AND T.TARGET_ID = PEG.TARGET_ID
+           AND T.GROUP_ID = L.GROUP_ID
+           AND T.TARGET_ID = L.TARGET_ID
+           AND L.DESCRIPTION = 'All local files'
+           AND PEG.IDX IN
+        <foreach item="group_list" index="index" collection="group_list" open="(" separator="," close=")">
+                #{group_list}
+        </foreach>
+    </select>
+    
+    <update id="updateReScanGroup" parameterType="hashmap">
+        UPDATE PI_PATH_EXCEPTION_GROUP PEG 
+        SET PEG.PATH_EX_GROUP_ID = 1 
+        WHERE PEG.IDX IN
+        <foreach item="group_list" index="index" collection="group_list" open="(" separator="," close=")">
+                #{group_list}
+        </foreach>
+    </update>
+    
+     <select id="globalFilterDetail" parameterType="hashmap" resultType="com.org.iopts.detection.vo.GlobalFilterVo">
+		SELECT T.NAME FROM PI_TARGETS T WHERE T.TARGET_ID = #{apply_to} AND T.AP_NO = #{status}
+	</select>
+	
+     <select id="selectServerNm" resultType="hashmap">
+		SELECT AP.NETWORK FROM PI_AP_SERVER AP WHERE AP.ap_no = #{status}
+	</select>
+
+</mapper>

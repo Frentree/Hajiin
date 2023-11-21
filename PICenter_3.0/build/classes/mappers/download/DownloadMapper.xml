@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.download.dao.DownloadDAO">
+
+    <select id="selectDownloadIndex" resultType="int">
+		SELECT IFNULL(MAX(NOTICE_FILE_ID),0) AS IDX FROM PI_NOTICE_FILE
+	</select>	
+	
+	
+	<insert id="insertDownload" parameterType="hashmap">
+		INSERT INTO PI_NOTICE_FILE
+		(
+			USER_NO,
+			FILE_NAME,
+			REAL_FILE_NAME,
+			REGDATE
+		)
+		VALUES
+		(
+			#{user_no},
+			#{file_name},
+			#{real_file_name},
+			NOW()
+		)
+		<selectKey resultType="int" keyProperty="NOTICE_FILE_ID" order="AFTER">
+			SELECT LAST_INSERT_ID() AS NOTICE_FILE_ID
+		</selectKey>
+	</insert>
+	
+    <select id="selectFileDownloadIndex" resultType="int">
+		SELECT IFNULL(MAX(DOWNLOAD_FILE_ID),0) AS IDX FROM PI_DOWNLOAD_FILE
+	</select>	
+	
+	
+	<insert id="insertFileDownload" parameterType="hashmap">
+		INSERT INTO pi_download_file
+		(
+			USER_NO,
+			FILE_NAME,
+			REAL_FILE_NAME,
+			REGDATE
+		)
+		VALUES
+		(
+			#{user_no},
+			#{file_name},
+			#{real_file_name},
+			NOW()
+		)
+		<selectKey resultType="int" keyProperty="DOWNLOAD_FILE_ID" order="AFTER">
+			SELECT LAST_INSERT_ID() AS DOWNLOAD_FILE_ID
+		</selectKey>
+	</insert>
+</mapper>

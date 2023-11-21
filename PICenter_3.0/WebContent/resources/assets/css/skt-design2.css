@@ -1,0 +1,92 @@
+@charset "utf-8";
+@import url('font.css');
+
+html{
+	height: 100%;
+	overflow: auto;
+	display: block;
+	margin: 0 auto;
+}
+body{
+	height: 100%;
+	font-size: 13px !important;
+}
+.wrap_login{
+	float: none;
+	width: 100%;
+	min-height: 100%;
+	margin: 0 auto;
+	padding: 250px 0 200px 0;
+}
+.container_login{
+	width: 500px;
+	height: 240px;
+	margin: 0 auto;
+}
+.login_top{
+	flaot: left;
+	width: 500px;
+	height: 43px;
+	background-color: #008080;
+	color: #FFF;
+	border-radius: 10px;
+}
+.login_box{
+	border: 1px solid #DEDEDE;
+	width: 500px;
+	height: 230px;
+}
+.login_logo{
+	float: left;
+	margin: 24px 0 0 14px;
+}
+.login_bar{
+	float: left;
+	margin: 24px 0 0 14px;
+	width: 2px;
+	height: 80px;
+	background: #CCC;
+}
+.login_input{
+	float: left;
+	margin: 20px 0 0 6px;
+	height: 115px;
+}
+.login_input li{
+	font-weight: bold;
+	color: #333;
+	text-align: right;
+	line-height: 27px;
+	font-size: 13px;
+}
+.login_input input{
+	width: 170px;
+	height: 27px;
+	font-size: 13px;
+}
+.btn_login{
+	float: right;
+	margin: 18px 22px 0 0;
+	display: block;
+	width: 88px;
+	height: 60px;
+	background-color: rgba(192,192,192,0.5);
+	border-radius: 10px;
+	font-size: 16px !important;
+}
+.btn_login:hover{
+	background-color: #008080;
+	color: #FFF;
+}
+.btn_info{
+	display: inline-block;
+	width: 72px;
+	height: 18px;
+	margin: 3px 0 0 29px;
+	font-size: 10px;
+	background-color: rgba(192,192,192,0.5);
+	border-radius: 5px;
+}
+.btn_info:hover{
+	background-color: #B3ECFF;
+}

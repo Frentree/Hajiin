@@ -1,0 +1,126 @@
+@charset "utf-8";
+@import url('font.css');
+
+html{
+	height: 100%;
+	overflow: auto;
+	display: block;
+	margin: 0 auto;
+}
+body{
+	height: 100%;
+	font-size: 13px !important;
+}
+.wrap_login{
+	clear: both;
+	width: 100%;
+	text-align: center;
+	margin: 0 auto;
+}
+.slogan{
+	margin-top: 230px;
+	font-size: 28px;
+	height: 60px;
+}
+.login_area{
+	width: 100%;
+	height: 235px;
+	background-color: rgba(211,211,211,0.5);
+}
+.login_box{
+	width: 522px;
+	height: 235px;
+	margin: 0 auto;
+}
+.tnet{
+	width: 150px;
+	height: 100px;
+	line-height: 100px;
+	color: #fff;
+	background-color: #FF7E00;
+	margin: 0 auto;
+	box-shadow: 2px 2px #999;
+}
+.tnet_text{
+	margin-top: 12px;
+}
+.tnet_box{
+	float: left;
+	padding-top: 45px;
+	width: 50%;
+	height: 100%;
+}
+.input_box{
+	float: left;
+	padding-top: 45px;
+	width: 50%;
+	height: 100%;
+}
+.input_box a {
+	cursor: pointer;
+}
+input{
+	padding: 4px;
+	border-radius: 5px;
+	border: 0 !important;
+	box-shadow: inset 1px 1px 3px #999;
+	margin: 5px;
+	width: 178px;
+}
+button{
+	width: 178px;
+	height: 27px;
+	color: #fff;
+	border-radius: 5px;
+	border: 0 !important;
+	background-color: #FF7E00;
+	box-shadow: 2px 2px #999;
+	margin: 5px 0;
+	font-size: 13px !important;
+}
+.common_banner{
+	clear: both;
+	width: 100%;
+	height: 50px;
+	margin: 0 auto;
+	padding-top: 15px;
+	text-align: center;
+	background-color: rgba(68,68,68,0.5);
+}
+.common_banner a{
+	cursor: pointer;
+	color: #fff;
+	padding: 0 15px;
+}
+.common_banner a:hover{
+	color: #F9ED1A !important;
+	text-decoration: none;
+}
+.sp_bnr{
+	width: 100%;
+	height: 30px;
+	margin: 0 auto;
+	margin-top: 20px;
+	text-align: center;
+}
+.sp_bnr a {
+	height: 14px;
+	padding: 5px 15px;
+	background-color: #F1DDBC;
+	border-radius: 30px;
+	color: #E58026;
+	margin: 0 10px;
+	cursor: pointer;
+}
+.sp_bnr a:hover{
+	text-decoration: none;
+}
+.footer_info{
+	width: 100%;
+	padding-top: 30px;
+	color: #858585;
+	text-align: center;
+	line-height: 140%;
+	font-size: 12px;
+}
+

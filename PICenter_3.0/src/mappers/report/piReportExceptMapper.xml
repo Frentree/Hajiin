@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.org.iopts.report.dao.piReportExceptDAO">
+    
+    <select id="searchExceptionList" parameterType="hashmap" resultType="hashmap">
+		SELECT PEG.target_id,
+		       TG.group_id,
+		       TG.name,
+		       PE.hash_code,
+		       PE.path_ex,
+		       PEG.user_no,
+		       (select user_name from pi_user where user_no = PEG.user_no) user_nm,
+		       PEG.ok_user_no,
+		        (select user_name from pi_user where user_no = PEG.ok_user_no) ok_user_nm,
+		       DATE_FORMAT(PEG.regdate, '%Y-%m-%d %H:%i:%s') as regdate,
+		       DATE_FORMAT(PEG.okdate, '%Y-%m-%d %H:%i:%s') as okdate,
+		       PEG.reason
+		  FROM pi_path_exception_group PEG
+		        ,pi_path_exception PE
+		      ,pi_targets TG
+		--      ,pi_find F
+		 WHERE 1=1
+		   AND PEG.idx = PE.path_exception_group_idx
+		   AND PEG.target_id = TG.target_id
+		--   AND PE.hash_code = F.hash_id
+		--   AND TG.target_id = F.target_id
+		--   AND TG.group_id = F.group_id
+		   AND PEG.approval_status = "E"
+		 ORDER BY PEG.idx DESC
+    </select>
+
+</mapper>
